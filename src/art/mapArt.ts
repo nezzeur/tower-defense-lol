@@ -16,15 +16,34 @@ export interface PathGeo {
   tiles: Set<string>;
 }
 
+/** Catmull-Rom spline through the waypoints, sampled every ~6px, so lanes curve organically. */
+function smoothLane(path: [number, number][], tile: number): { x: number; y: number }[] {
+  const P = path.map(([c, r]) => ({ x: (c + 0.5) * tile, y: (r + 0.5) * tile }));
+  const out: { x: number; y: number }[] = [P[0]];
+  for (let i = 0; i < P.length - 1; i++) {
+    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+    const n = Math.max(2, Math.ceil(Math.hypot(p2.x - p1.x, p2.y - p1.y) / 6));
+    for (let k = 1; k <= n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      const f = (a: number, b: number, c: number, d: number) =>
+        0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+      out.push({ x: f(p0.x, p1.x, p2.x, p3.x), y: f(p0.y, p1.y, p2.y, p3.y) });
+    }
+  }
+  return out;
+}
+
 export function pathGeometry(map: MapDef, tile: number): PathGeo {
   const tiles = new Set<string>();
   const lanes = [map.path, ...(map.lanes ?? [])].map((path) => {
-    for (let i = 1; i < path.length; i++) {
-      const [c0, r0] = path[i - 1], [c1, r1] = path[i];
-      for (let c = Math.min(c0, c1); c <= Math.max(c0, c1); c++)
-        for (let r = Math.min(r0, r1); r <= Math.max(r0, r1); r++) tiles.add(`${c},${r}`);
+    const pts = smoothLane(path, tile);
+    // Every tile the lane's body (about 0.8 tile wide) passes over
+    for (const p of pts) {
+      for (const [dx, dy] of [[0, 0], [-0.36, 0], [0.36, 0], [0, -0.36], [0, 0.36]]) {
+        tiles.add(`${Math.floor(p.x / tile + dx)},${Math.floor(p.y / tile + dy)}`);
+      }
     }
-    return path.map(([c, r]) => ({ x: (c + 0.5) * tile, y: (r + 0.5) * tile }));
+    return pts;
   });
   return { pts: lanes[0], lanes, tiles };
 }
