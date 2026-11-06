@@ -650,7 +650,7 @@ function mapInfoPanel(b: Battle): string {
     </div>
     <div class="hud-card tips">
       <div class="hud-title">Astuces</div>
-      <p>Glisse un champion de la barre d'équipe vers une case libre. Clique un champion placé pour voir sa fiche.</p>
+      <p><b>Placer</b> : glisse un champion de la barre d'équipe (ou clique-le puis clique une case).</p><p><b>Améliorer</b> : clique un champion sur la carte, sa fiche s'ouvre à droite.</p><p><b>Déplacer</b> : maintiens le clic sur un champion et glisse-le.</p>
       <p>Raccourcis : <kbd>Espace</kbd> lancer la vague · <kbd>P</kbd> pause · <kbd>Échap</kbd> annuler.</p>
     </div>`;
 }

@@ -319,35 +319,47 @@ export class Battle {
     return ok;
   }
 
+  /** Champion being dragged on the board (moving only happens by press-and-drag). */
+  private dragging: Tower | null = null;
+
   private bindInput(): void {
-    let drag: { t: Tower; x: number; y: number; moved: boolean } | null = null;
+    let drag: { t: Tower; x: number; y: number } | null = null;
     const cv = this.canvas;
+    const cursor = () => {
+      const t = this.hover && this.towers.find((x) => x.c === this.hover!.c && x.r === this.hover!.r);
+      cv.style.cursor = this.dragging ? 'grabbing' : t ? 'grab' : this.selectedRoster ? 'copy' : 'default';
+    };
     cv.addEventListener('pointermove', (e) => {
       this.hover = this.tileAtClient(e.clientX, e.clientY);
-      if (drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) {
-        drag.moved = true;
+      if (drag && !this.dragging && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) {
+        this.dragging = drag.t;
         this.selectedTower = drag.t;
+        this.ev.onChange();
       }
+      cursor();
     });
-    cv.addEventListener('pointerleave', () => { this.hover = null; });
+    cv.addEventListener('pointerleave', () => { if (!this.dragging) this.hover = null; cv.style.cursor = 'default'; });
     cv.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
       const tile = this.tileAtClient(e.clientX, e.clientY);
       const t = tile && this.towers.find((x) => x.c === tile.c && x.r === tile.r);
-      if (t && e.button === 0) {
-        drag = { t, x: e.clientX, y: e.clientY, moved: false };
+      if (t) {
+        drag = { t, x: e.clientX, y: e.clientY };
         cv.setPointerCapture(e.pointerId);
       }
     });
     cv.addEventListener('pointerup', (e) => {
-      if (drag?.moved) {
+      if (this.dragging) {
         const tile = this.tileAtClient(e.clientX, e.clientY);
-        if (tile) this.moveTower(drag.t, tile.c, tile.r);
-        this.selectedTower = drag.t;
+        if (tile) this.moveTower(this.dragging, tile.c, tile.r);
+        this.selectedTower = this.dragging;
+        this.dragging = null;
         this.ev.onChange();
       } else {
         this.clickTile(e);
       }
       drag = null;
+      cursor();
     });
     cv.addEventListener('contextmenu', (e) => {
       e.preventDefault();
@@ -357,6 +369,7 @@ export class Battle {
     });
   }
 
+  /** Click: select a champion, place the one picked in the team bar, or clear the selection. */
   private clickTile(e: PointerEvent): void {
     if (e.button !== 0) return;
     const tile = this.tileAtClient(e.clientX, e.clientY);
@@ -367,11 +380,8 @@ export class Battle {
       this.dropChampion(this.selectedRoster, c, r);
       return;
     }
-    if (this.selectedTower && !hit && this.canPlace(c, r)) this.moveTower(this.selectedTower, c, r);
-    else {
-      this.selectedTower = hit ?? null;
-      this.selectedRoster = null;
-    }
+    this.selectedTower = hit ?? null;
+    this.selectedRoster = null;
     this.ev.onChange();
   }
 
@@ -807,7 +817,7 @@ export class Battle {
     this.drawPortal(g, Math.min(W - 20, Math.max(20, start.x)), Math.min(H - 20, Math.max(20, start.y)));
 
     // Placement preview
-    if (this.hover && (this.selectedRoster || this.selectedTower)) {
+    if (this.hover && (this.selectedRoster || this.dragging)) {
       const { c, r } = this.hover;
       const ok = this.canPlace(c, r) && (this.selectedTower || this.slotsLeft() > 0);
       g.fillStyle = ok ? 'rgba(10,200,185,0.22)' : 'rgba(255,60,60,0.28)';
@@ -818,15 +828,26 @@ export class Battle {
       g.fill();
       g.stroke();
       if (ok) {
-        const id = this.selectedRoster ?? this.selectedTower!.def.id;
+        const id = this.selectedRoster ?? this.dragging!.def.id;
         this.rangeRing(g, (c + 0.5) * TILE, (r + 0.5) * TILE, computeStats(champ(id)).range, 'rgba(10,200,185,0.7)');
+        // Ghost of the champion under the cursor
+        const img = squareImage(id);
+        if (img) {
+          g.save();
+          g.globalAlpha = 0.75;
+          g.beginPath();
+          g.arc((c + 0.5) * TILE, (r + 0.5) * TILE - 4, 17, 0, Math.PI * 2);
+          g.clip();
+          g.drawImage(img, (c + 0.5) * TILE - 19, (r + 0.5) * TILE - 23, 38, 38);
+          g.restore();
+        }
       }
     }
-    if (this.selectedTower) this.rangeRing(g, this.selectedTower.x, this.selectedTower.y, this.selectedTower.stats.range, 'rgba(240,230,210,0.85)');
+    if (this.selectedTower && !this.dragging) this.rangeRing(g, this.selectedTower.x, this.selectedTower.y, this.selectedTower.stats.range, 'rgba(240,230,210,0.85)');
 
     const units: { y: number; draw: () => void }[] = [
       ...this.enemies.map((e) => ({ y: e.y, draw: () => this.drawEnemy(g, e) })),
-      ...this.towers.map((t) => ({ y: t.y, draw: () => this.drawTower(g, t) })),
+      ...this.towers.map((t) => ({ y: t.y, draw: () => { if (t === this.dragging) g.globalAlpha = 0.35; this.drawTower(g, t); g.globalAlpha = 1; } })),
       { y: end.y, draw: () => this.drawNexus(g, end.x, end.y) },
     ];
     units.sort((a, b) => a.y - b.y).forEach((u) => u.draw());
