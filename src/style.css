@@ -760,3 +760,4 @@ kbd { font: 600 11px Inter, sans-serif; background: #fff8e6; border: 1px solid #
 .tile-bonus b { color: var(--c); }
 .feat-icons { display: flex; gap: 4px; margin: 2px 0; }
 .feat-icons span { width: 22px; height: 22px; display: grid; place-items: center; font-size: 12px; background: #0f2440; border: 1px solid var(--gold4); }
+.arena-tag { position: absolute; left: 8px; top: 8px; background: linear-gradient(#f3d98f, #c99a45); color: #2a1a05; font: 700 11px Cinzel, serif; padding: 2px 8px; border: 1px solid #fff0c0; }

@@ -1,9 +1,11 @@
-import type { MapDef } from '../types';
+import type { MapDef, MapStyle } from '../types';
+import { generateMap } from './mapgen';
 
 export const COLS = 20;
 export const ROWS = 12;
 
-export const MAPS: MapDef[] = [
+/** Hand-authored maps (some are kept for later region updates). */
+const HAND: MapDef[] = [
   {
     id: 'botlane', name: 'Voie du Bas', subtitle: 'Faille de l\'invocateur', unlock: 0, mult: 1.5, waves: 50,
     path: [[-1, 2], [15, 2], [15, 5], [4, 5], [4, 9], [18, 9]],
@@ -227,5 +229,77 @@ export const MAPS: MapDef[] = [
     finalBoss: 'fallenking',
   },
 ];
+
+const hand = (id: string, region: string, waves: number): MapDef => ({ ...HAND.find((m) => m.id === id)!, region, waves });
+const theme = (id: string) => HAND.find((m) => m.id === id)!.theme;
+
+/** Bosses rotated through on generated maps (finals keep their own). */
+const BOSS_POOL = ['riftherald', 'poroking', 'colossus', 'petricite', 'baron', 'warbeast', 'spiritguard', 'sentinel', 'automaton', 'fallenking'];
+
+interface RegionPlan {
+  id: string;
+  style: MapStyle;
+  theme: string;
+  subtitle: string;
+  /** Map names in order; a string entry starting with '@' is a hand-authored map id. */
+  maps: string[];
+}
+
+/** Regions ("cities"): the first has 5 maps, each next one has one more. The last map is the region's arena. */
+const REGION_PLANS: RegionPlan[] = [
+  { id: 'rift', style: 'rift', theme: 'botlane', subtitle: 'Faille de l\'invocateur', maps: ['@botlane', 'Voie du Haut', 'Voie du Milieu', 'Rivière de la Faille', '@jungle'] },
+  { id: 'demacia', style: 'demacia', theme: 'demacia', subtitle: 'Demacia', maps: ['Champs dorés', 'Forêt de pétricite', 'Remparts de l\'Ouest', 'Village fortifié', 'Pont du Roi', '@demacia'] },
+  { id: 'freljord', style: 'tundra', theme: 'freljord', subtitle: 'Freljord', maps: ['Plaine gelée', 'Col des glaces', 'Forêt de pins', '@aram', 'Village des glaces', 'Lac de givre', '@freljord'] },
+  { id: 'noxus', style: 'noxus', theme: 'noxus', subtitle: 'Noxus', maps: ['Routes impériales', 'Mines de fer', 'Camp militaire', 'Faille rouge', 'Remparts noxiens', 'Marché de Noxus', 'Bastion immortel', '@noxus'] },
+  { id: 'ionia', style: 'ionia', theme: 'ionia', subtitle: 'Ionia', maps: ['Jardins sacrés', 'Pont des esprits', 'Forêt de bambous', 'Monastère', 'Rizières', 'Lac aux lanternes', 'Village des cerisiers', 'Falaises du vent', '@ionia'] },
+];
+
+/** Waves on regular maps; region arenas (last map) have FINAL_WAVES. */
+const WAVES = 30;
+const FINAL_WAVES = 40;
+
+/** Difficulty multiplier by global map index (tuned with scripts/sim.ts). */
+export const MAP_CURVE = { base: 1.5, growth: 1.24 };
+
+function buildMaps(): MapDef[] {
+  const out: MapDef[] = [];
+  let seed = 11;
+  for (const plan of REGION_PLANS) {
+    plan.maps.forEach((entry, i) => {
+      const final = i === plan.maps.length - 1;
+      const waves = final ? FINAL_WAVES : WAVES;
+      if (entry.startsWith('@')) {
+        out.push(hand(entry.slice(1), plan.id, waves));
+        return;
+      }
+      out.push(generateMap({
+        id: `${plan.id}-${i + 1}`, name: entry, subtitle: plan.subtitle, region: plan.id, style: plan.style,
+        theme: { ...theme(plan.theme), style: plan.style }, waves, finalBoss: BOSS_POOL[out.length % BOSS_POOL.length], seed: seed++,
+      }));
+    });
+  }
+  return out;
+}
+
+export const MAPS: MapDef[] = buildMaps();
+
+/** Applies the difficulty curve (also used by the balance bot to try other curves). */
+export function applyCurve(): void {
+  MAPS.forEach((m, i) => { m.mult = MAP_CURVE.base * MAP_CURVE.growth ** i * laneFactor(m); });
+}
+
+/**
+ * Short lanes and split lanes give towers less time per enemy, so those maps get a lower
+ * multiplier; long single lanes get a higher one. Keeps generated maps on the same curve.
+ */
+function laneFactor(m: MapDef): number {
+  const lanes = [m.path, ...(m.lanes ?? [])];
+  const lengths = lanes.map((p) => p.slice(1).reduce((n, [c, r], k) => n + Math.abs(c - p[k][0]) + Math.abs(r - p[k][1]), 0));
+  const avg = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+  return Math.min(1.6, Math.max(0.3, (avg / 45) ** 1.5 / Math.sqrt(lanes.length)));
+}
+applyCurve();
+
+export const REGION_IDS = REGION_PLANS.map((p) => p.id);
 
 export const MAP_BY_ID: Record<string, MapDef> = Object.fromEntries(MAPS.map((m) => [m.id, m]));

@@ -105,6 +105,8 @@ export interface Landmark {
 export interface MapDef {
   id: string;
   name: string;
+  /** Region ("city") the map belongs to. */
+  region?: string;
   subtitle: string;
   unlock: number;
   mult: number;

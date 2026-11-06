@@ -44,13 +44,38 @@ export function computeStats(def: ChampionDef, lvl = level(def.id)): Stats {
   return s;
 }
 
+/** Stars on one map (or all): one per fifth of its waves cleared. */
 export function stars(mapId?: string): number {
   const maps = mapId ? MAPS.filter((m) => m.id === mapId) : MAPS;
-  return maps.reduce((n, m) => n + Math.min(5, Math.floor((store.data.best[m.id] ?? 0) / 10)), 0);
+  return maps.reduce((n, m) => n + Math.min(5, Math.floor(((store.data.best[m.id] ?? 0) * 5) / m.waves)), 0);
 }
 
-export const teamSlots = (): number => Math.min(8, 3 + Math.floor(stars() / 4));
-export const isUnlocked = (m: MapDef): boolean => stars() >= m.unlock;
+export const teamSlots = (): number => Math.min(8, 3 + Math.floor(stars() / 8));
+
+/** Stars needed on the previous map of a region to open the next one. */
+export const STARS_TO_ADVANCE = 3;
+
+/**
+ * Maps open in order inside a region: each needs 3 stars on the previous one.
+ * A region's first map opens once the previous region's arena (its last map) is beaten.
+ */
+export function unlockReason(m: MapDef): string | null {
+  const i = MAPS.indexOf(m);
+  if (i <= 0) return null;
+  const prev = MAPS[i - 1];
+  if (prev.region === m.region) {
+    return stars(prev.id) >= STARS_TO_ADVANCE ? null : `${STARS_TO_ADVANCE} ★ sur « ${prev.name} »`;
+  }
+  return (store.data.best[prev.id] ?? 0) >= prev.waves ? null : `Bats l'arène « ${prev.name} »`;
+}
+
+export const isUnlocked = (m: MapDef): boolean => unlockReason(m) === null;
+
+/** True when this map is its region's arena (last map). */
+export const isArena = (m: MapDef): boolean => {
+  const i = MAPS.indexOf(m);
+  return i === MAPS.length - 1 || MAPS[i + 1].region !== m.region;
+};
 
 export const hpScale = (m: MapDef, w: number): number => m.mult * (1 + 0.1 * (w - 1)) * BALANCE.hpPerWave ** (w - 1);
 export const goldScale = (m: MapDef, w: number): number => (1 + BALANCE.goldPerWave * w) * m.mult ** BALANCE.goldMultExp;

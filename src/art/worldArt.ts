@@ -1,5 +1,6 @@
 // Pixel-art world map: regions of Runeterra (original illustration), drawn once,
 // plus an animated layer (waves, clouds, boats, birds, weather, region highlight).
+import { MAPS } from '../data/maps';
 import { shade } from './pixel';
 
 export const WW = 320;
@@ -48,7 +49,7 @@ export const REGIONS: Region[] = [
   // Decorative regions
   {
     id: 'ionia', name: 'Ionia', desc: 'Terre des esprits, des cerisiers et des lanternes.', color: '#ff9ed2', maps: ['ionia'], lx: 262, ly: 50, ground: '#8fcf7a', coast: 'beach', weather: 'petals',
-    blobs: [[266, 66, 22, 14], [290, 58, 12, 9], [250, 78, 10, 7]],
+    blobs: [[264, 64, 30, 19], [294, 54, 12, 9], [246, 82, 12, 8]],
   },
   {
     id: 'noxus', name: 'Noxus', desc: 'L\'Empire ne connaît que la force.', color: '#ff5a5a', maps: ['noxus'], lx: 52, ly: 96, ground: '#8a6458', coast: 'cliff',
@@ -57,7 +58,7 @@ export const REGIONS: Region[] = [
   {
     id: 'demacia', name: 'Demacia', desc: 'Un royaume de pierre blanche et d\'idéaux.', color: '#f5d76e',
     maps: ['demacia'], lx: 30, ly: 62, ground: '#7fbf6a', coast: 'cliff',
-    blobs: [[30, 78, 20, 12], [50, 72, 12, 8], [20, 86, 10, 7]],
+    blobs: [[30, 80, 27, 15], [54, 70, 13, 9], [16, 90, 10, 7]],
   },
   {
     id: 'piltover', name: 'Piltover', desc: 'La Cité du progrès et de l\'hextech.', color: '#3fe0d0',
@@ -70,21 +71,42 @@ export const REGIONS: Region[] = [
   },
 ];
 
+// Regions get their maps from the map list (a region without maps is decorative)
+for (const reg of REGIONS) reg.maps = MAPS.filter((m) => m.region === reg.id).map((m) => m.id);
+
 export const REGION_OF: Record<string, string> = Object.fromEntries(REGIONS.flatMap((r) => r.maps.map((m) => [m, r.id])));
 
-/** Map node positions in world px. */
-export const NODE_PX: Record<string, { x: number; y: number }> = {
-  botlane: { x: 132, y: 108 },
-  jungle: { x: 172, y: 100 },
-  aram: { x: 148, y: 30 },
-  freljord: { x: 74, y: 40 },
-  shurima: { x: 168, y: 168 },
-  shadowisles: { x: 280, y: 130 },
-  demacia: { x: 32, y: 80 },
-  noxus: { x: 70, y: 118 },
-  ionia: { x: 268, y: 66 },
-  piltover: { x: 222, y: 92 },
-};
+/**
+ * Map node positions in world px: spread evenly over the region's land (farthest-point sampling),
+ * then chained in visiting order from the westernmost point.
+ */
+export const NODE_PX: Record<string, { x: number; y: number }> = {};
+for (const reg of REGIONS) {
+  const n = reg.maps.length;
+  if (!n) continue;
+  const cand: { x: number; y: number }[] = [];
+  for (let y = 0; y < WH; y += 3) for (let x = 0; x < WW; x += 3) {
+    if (reg.blobs.some(([bx, by, rx, ry]) => ((x - bx) / (rx * 0.72)) ** 2 + ((y - by) / (ry * 0.62)) ** 2 < 1)) cand.push({ x, y });
+  }
+  const chosen = [cand.reduce((a, b) => (b.x < a.x ? b : a))];
+  while (chosen.length < n && chosen.length < cand.length) {
+    let best = cand[0], bd = -1;
+    for (const c of cand) {
+      const d = Math.min(...chosen.map((q) => (q.x - c.x) ** 2 + ((q.y - c.y) * 1.4) ** 2));
+      if (d > bd) { bd = d; best = c; }
+    }
+    chosen.push(best);
+  }
+  // Visiting order: nearest neighbour chain from the first point
+  const order = [chosen.shift()!];
+  while (chosen.length) {
+    const last = order[order.length - 1];
+    let k = 0;
+    chosen.forEach((c, i) => { if ((c.x - last.x) ** 2 + (c.y - last.y) ** 2 < (chosen[k].x - last.x) ** 2 + (chosen[k].y - last.y) ** 2) k = i; });
+    order.push(chosen.splice(k, 1)[0]);
+  }
+  reg.maps.forEach((id, i) => { NODE_PX[id] = order[i] ?? order[order.length - 1]; });
+}
 
 /** HD painting scale: the world is painted at WW*S x WH*S. */
 export const S = 4;

@@ -9,7 +9,7 @@ import { CHAMPIONS } from './data/champions';
 import { ITEMS, ITEM_BY_ID } from './data/items';
 import { MAPS, MAP_BY_ID } from './data/maps';
 import {
-  champ, CHEST_CHOICES, chestPool, chestPrice, claimChest, EPIC_PITY, computeStats, enemyName, fmt, isUnlocked, level, levelCost, MAX_LEVEL, openChest,
+  champ, CHEST_CHOICES, isArena, unlockReason, chestPool, chestPrice, claimChest, EPIC_PITY, computeStats, enemyName, fmt, isUnlocked, level, levelCost, MAX_LEVEL, openChest,
   rewardFor, stars, teamSlots, tryLevelUp, ULT_LEVELS, ultRank,
 } from './game';
 import { exportSave, importSave, persist, resetSave, store } from './save';
@@ -177,13 +177,13 @@ function mapCard(id: string, cur: string): string {
   const m = MAP_BY_ID[id], open = isUnlocked(m), best = store.data.best[m.id] ?? 0, rw = rewardFor(m.id);
   const done = best >= m.waves;
   return `<div class="level-card ${open ? '' : 'locked'} ${id === cur ? 'cur' : ''}" style="--a:${m.theme.accent}">
-    <div class="level-thumb">${mapThumb(id)}${open ? '' : '<div class="lock-veil">🔒</div>'}${id === cur ? '<span class="cur-tag">En cours</span>' : ''}</div>
+    <div class="level-thumb">${mapThumb(id)}${open ? '' : '<div class="lock-veil">🔒</div>'}${id === cur ? '<span class="cur-tag">En cours</span>' : ''}${isArena(m) ? '<span class="arena-tag">⚔ Arène</span>' : ''}</div>
     <div class="level-body">
       <div class="level-title"><b>${esc(m.name)}</b>${done ? '<span class="done">✔</span>' : ''}</div>
       <div class="muted small">${esc(m.subtitle)}</div>
       <div class="feat-icons">${(m.lanes?.length ? '<span title="Plusieurs voies">⇉</span>' : '') + [...new Set((m.features ?? []).map((f) => f.kind))].map((k) => `<span title="${esc(FEATURE_INFO[k].name)}">${FEATURE_INFO[k].icon}</span>`).join('')}</div>
       ${open ? `${starRow(stars(m.id))}<div class="small">Record <b>${best}</b>/${m.waves} · Boss : ${esc(enemyName(m.finalBoss))}</div>`
-        : `<div class="lock small">${m.unlock} ★ requises (tu en as ${stars()})</div>`}
+        : `<div class="lock small">🔒 ${esc(unlockReason(m) ?? '')}</div>`}
       <div class="level-foot">
         ${rw ? `<span class="reward-chip">${portrait(rw, 22, !store.data.owned.includes(rw.id))}${store.data.owned.includes(rw.id) ? esc(rw.name) : 'Récompense ???'}</span>` : '<span></span>'}
         <button class="btn start" data-map="${id}" ${open ? '' : 'disabled'}>Jouer ▶</button>
@@ -202,11 +202,11 @@ function mapsScreen(): string {
     const a = NODE_PX[MAPS[i].id], b = NODE_PX[to.id];
     return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" class="${isUnlocked(to) ? 'open' : ''}"/>`;
   }).join('');
-  const nodes = MAPS.map((m, i) => {
+  const nodes = MAPS.map((m) => {
     const open = isUnlocked(m), done = (store.data.best[m.id] ?? 0) >= m.waves, n = NODE_PX[m.id];
     return `<button class="node ${open ? '' : 'locked'} ${done ? 'done' : ''} ${m.id === cur ? 'cur' : ''}"
       data-region="${REGION_OF[m.id]}" style="left:${(n.x / WW) * 100}%;top:${(n.y / WH) * 100}%;--a:${m.theme.accent}" title="${esc(m.name)}">
-      <span class="pin">${open ? (done ? '★' : i + 1) : '🔒'}</span><span class="label">${esc(m.name)}</span></button>`;
+      <span class="pin">${open ? (done ? '★' : MAPS.filter((x) => x.region === m.region).indexOf(m) + 1) : '🔒'}</span><span class="label">${esc(m.name)}</span></button>`;
   }).join('');
   const labels = REGIONS.map((r) => `<div class="region-label ${r.maps.length ? '' : 'deco'} ${r.id === selectedRegion ? 'on' : ''}"
     style="left:${(r.lx / WW) * 100}%;top:${(r.ly / WH) * 100}%;--c:${r.color}">${esc(r.name)}</div>`).join('');

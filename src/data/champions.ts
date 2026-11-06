@@ -222,7 +222,7 @@ export const CHAMPIONS: ChampionDef[] = [
   },
   {
     id: 'malzahar', name: 'Malzahar', title: 'Le Prophète du Néant', role: 'Mage', region: 'Néant',
-    color: '#a55eea', rarity: 3, reward: 'shurima',
+    color: '#a55eea', rarity: 3,
     passive: 'Visions malveillantes : infecte 2 cibles, gros dégâts sur la durée.',
     base: base({ dmg: 6, rate: 0.6, range: 3.4, type: 'multi', targets: 2, burn: { mult: 1, dur: 5 } }),
     ult: {
@@ -262,7 +262,7 @@ export const CHAMPIONS: ChampionDef[] = [
   },
   {
     id: 'jayce', name: 'Jayce', title: 'Le Défenseur de demain', role: 'Tireur', region: 'Piltover',
-    color: '#3fa3e0', rarity: 3, reward: 'piltover',
+    color: '#3fa3e0', rarity: 3,
     passive: 'Canon Mercure : tous les 4 tirs, dégâts doublés.',
     base: base({ dmg: 20, rate: 0.9, range: 4, everyN: { n: 4, mult: 2 } }),
     ult: {

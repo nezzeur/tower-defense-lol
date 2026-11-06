@@ -4,7 +4,7 @@
 import { Battle, TILE } from '../src/battle';
 import { CHAMPIONS } from '../src/data/champions';
 import { ITEMS } from '../src/data/items';
-import { COLS, MAPS, ROWS } from '../src/data/maps';
+import { applyCurve, COLS, MAP_CURVE, MAPS, ROWS } from '../src/data/maps';
 import {
   BALANCE, chestPool, claimChest, chestPrice, computeStats, isUnlocked, level, levelCost, MAX_LEVEL, openChest, rewardFor, stars, teamSlots,
   tryLevelUp,
@@ -18,9 +18,10 @@ const WAVE_GAP = 2;
 const starter = process.argv[2] ?? 'ashe';
 const maxHours = Number(process.argv[3] ?? 30);
 
-// Sweep overrides: BAL='{"dmgPerLevel":1.07}' MULTS='1,5,25,120,600,3000'
+// Sweep overrides: BAL='{"dmgPerLevel":1.07}' GROWTH=1.2 BASE=1.5
 Object.assign(BALANCE, JSON.parse(process.env.BAL ?? '{}'));
-if (process.env.MULTS) process.env.MULTS.split(',').forEach((v, i) => { MAPS[i].mult = Number(v); });
+if (process.env.GROWTH) { MAP_CURVE.growth = Number(process.env.GROWTH); applyCurve(); }
+if (process.env.BASE) { MAP_CURVE.base = Number(process.env.BASE); applyCurve(); }
 
 store.data.owned = [starter];
 let time = 0;
