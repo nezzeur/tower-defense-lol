@@ -89,6 +89,19 @@ export interface MapFeature {
   h?: number;
 }
 
+export type LandmarkKind =
+  | 'fountain' | 'inhibitor' | 'baronpit' | 'citadel' | 'statue' | 'arena' | 'fortress'
+  | 'shrine' | 'hexgate' | 'sundisc' | 'pyramid' | 'ruins' | 'graves' | 'waterfall' | 'camp' | 'workshop';
+
+/** Large decorative set piece (blocks placement over its w x h tiles). */
+export interface Landmark {
+  kind: LandmarkKind;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface MapDef {
   id: string;
   name: string;
@@ -101,6 +114,14 @@ export interface MapDef {
   /** Extra lanes; each must end on the same nexus tile as path. */
   lanes?: [number, number][][];
   features?: MapFeature[];
+  /**
+   * Terrain rows (ROWS strings of COLS chars). '.' grass, ',' flowers, 's' shore/sand, 'H' high ground (+range),
+   * 'T' forest, 'R' rocks, '~' water (the last three block placement).
+   */
+  terrain?: string[];
+  landmarks?: Landmark[];
+  /** Spline-smoothed lanes (default: straight tile lanes). */
+  curvy?: boolean;
   theme: MapTheme;
   finalBoss: string;
 }

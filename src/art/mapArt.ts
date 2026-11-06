@@ -36,16 +36,36 @@ function smoothLane(path: [number, number][], tile: number): { x: number; y: num
 export function pathGeometry(map: MapDef, tile: number): PathGeo {
   const tiles = new Set<string>();
   const lanes = [map.path, ...(map.lanes ?? [])].map((path) => {
-    const pts = smoothLane(path, tile);
-    // Every tile the lane's body (about 0.8 tile wide) passes over
-    for (const p of pts) {
-      for (const [dx, dy] of [[0, 0], [-0.36, 0], [0.36, 0], [0, -0.36], [0, 0.36]]) {
-        tiles.add(`${Math.floor(p.x / tile + dx)},${Math.floor(p.y / tile + dy)}`);
+    if (map.curvy) {
+      const pts = smoothLane(path, tile);
+      for (const p of pts) {
+        for (const [dx, dy] of [[0, 0], [-0.36, 0], [0.36, 0], [0, -0.36], [0, 0.36]]) {
+          tiles.add(`${Math.floor(p.x / tile + dx)},${Math.floor(p.y / tile + dy)}`);
+        }
       }
+      return pts;
     }
-    return pts;
+    // Straight tile lanes: waypoints are tile coordinates joined by horizontal/vertical runs
+    for (let i = 1; i < path.length; i++) {
+      const [c0, r0] = path[i - 1], [c1, r1] = path[i];
+      for (let c = Math.min(c0, c1); c <= Math.max(c0, c1); c++)
+        for (let r = Math.min(r0, r1); r <= Math.max(r0, r1); r++) tiles.add(`${c},${r}`);
+    }
+    return path.map(([c, r]) => ({ x: (c + 0.5) * tile, y: (r + 0.5) * tile }));
   });
   return { pts: lanes[0], lanes, tiles };
+}
+
+/** Terrain char at a tile ('.' outside the authored grid). */
+export function terrainAt(map: MapDef, c: number, r: number): string {
+  return map.terrain?.[r]?.[c] ?? '.';
+}
+
+/** Tiles covered by landmarks. */
+export function landmarkTiles(map: MapDef): Set<string> {
+  const out = new Set<string>();
+  for (const l of map.landmarks ?? []) for (let dc = 0; dc < l.w; dc++) for (let dr = 0; dr < l.h; dr++) out.add(`${l.x + dc},${l.y + dr}`);
+  return out;
 }
 
 /** Expands map features into a tile -> kind lookup. */

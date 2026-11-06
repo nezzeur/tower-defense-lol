@@ -1,6 +1,6 @@
 import { mobImage } from './art/mobArt';
 import { squareImage } from './art/champArt';
-import { FEATURE_INFO, featureTiles, LH, LW, pathGeometry, spawnMote, type Mote } from './art/mapArt';
+import { FEATURE_INFO, featureTiles, landmarkTiles, LH, LW, pathGeometry, spawnMote, terrainAt, type Mote } from './art/mapArt';
 import { drawMapHD } from './art/mapHD';
 import { CREATURE_HEIGHT, drawCreature } from './art/creatures';
 import { shade } from './art/pixel';
@@ -107,6 +107,7 @@ export class Battle {
   private pathTiles = new Set<string>();
   private lanes: { pts: { x: number; y: number }[]; cum: number[]; len: number }[] = [];
   private features = new Map<string, FeatureKind>();
+  private blocked = new Set<string>();
   private turrets: { x: number; y: number; cd: number }[] = [];
   private spawnCount = 0;
 
@@ -197,6 +198,10 @@ export class Battle {
     });
     this.pathLen = Math.max(...this.lanes.map((l) => l.len));
     this.features = featureTiles(this.map);
+    this.blocked = landmarkTiles(this.map);
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      if ('TR~'.includes(terrainAt(this.map, c, r))) this.blocked.add(`${c},${r}`);
+    }
     this.turrets = (this.map.features ?? []).filter((f) => f.kind === 'turret')
       .map((f) => ({ x: (f.c + 0.5) * TILE, y: (f.r + 0.5) * TILE, cd: 0 }));
   }
@@ -224,6 +229,7 @@ export class Battle {
     if (f === 'blue') s.rate *= 1.25;
     if (f === 'red') { s.dmg *= 1.1; s.burn = s.burn ? { mult: s.burn.mult + 0.25, dur: s.burn.dur } : { mult: 0.25, dur: 3 }; }
     if (f === 'brush') s.dmg *= 1.2;
+    if (terrainAt(this.map, c, r) === 'H') s.range += 0.6;
     for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) {
       if (this.featureAt(c + dc, r + dr) === 'dragon') { s.dmg *= 1.15; dc = dr = 2; }
     }
@@ -235,6 +241,7 @@ export class Battle {
   canPlace(c: number, r: number): boolean {
     const f = this.featureAt(c, r);
     return c >= 0 && r >= 0 && c < COLS && r < ROWS && !this.pathTiles.has(`${c},${r}`) && f !== 'river' && f !== 'turret' && f !== 'dragon'
+      && !this.blocked.has(`${c},${r}`)
       && !this.towers.some((t) => t.c === c && t.r === r);
   }
 
