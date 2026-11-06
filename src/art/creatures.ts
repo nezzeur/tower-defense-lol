@@ -2,6 +2,8 @@
 // Original designs built from generic archetypes (soldiers, crab, wolf, bird, rock golem, toad,
 // dragon, larva, serpent, furball, ghost). Local coords: feet at (0, 0), facing +x.
 import { shade } from './pixel';
+import { DESIGN_SVG } from './mobDesign';
+import { EXTRA_SVG } from './mobExtra';
 
 type G = CanvasRenderingContext2D;
 const OUT = '#120e18';
@@ -426,6 +428,8 @@ export const CREATURE_HEIGHT: Record<string, number> = {
 
 /** scale > 1 draws the creature in HD (smooth vector mode) at that size multiplier. */
 export function drawCreature(g: G, id: string, x: number, y: number, facing: number, ph: number, t: number, team: string, flash: boolean, scale = 1): void {
+  const spr = sprite(id);
+  if (spr) { drawSprite(g, spr, id, x, y, facing, ph, t, flash, scale); return; }
   g.save();
   smooth = scale > 1;
   g.translate(smooth ? x : Math.round(x), smooth ? y : Math.round(y));
@@ -457,5 +461,52 @@ export function drawCreature(g: G, id: string, x: number, y: number, facing: num
     default: minion(g, ph, team);
   }
   smooth = false;
+  g.restore();
+}
+
+// ---------- Vector sprites (cartoon bestiary): SVG pre-rendered once per type to an offscreen canvas ----------
+interface Sprite { cv: HTMLCanvasElement; k: number } // k = canvas px per SVG unit
+const sprites = new Map<string, Sprite | null>();
+/** Top of the artwork (SVG y) so the drawn height matches CREATURE_HEIGHT. Feet are at y=184. */
+const TOP: Record<string, number> = {
+  melee: 24, caster: 10, cannon: 34, super: 4, scuttle: 56, wolf: 32, raptor: 22, krug: 48, gromp: 42, drake: 28,
+  herald: 78, riftherald: 16, baron: 18, poroking: 18, colossus: 8, sentinel: 6, fallenking: 16, petricite: 16,
+  warbeast: 24, spiritguard: 14, automaton: 0,
+};
+const FLOATERS = new Set(['drake', 'fallenking', 'spiritguard', 'caster']);
+const RES = 6; // canvas px per low-res px of creature height
+
+function sprite(id: string): Sprite | null {
+  if (sprites.has(id)) return sprites.get(id)!;
+  const body = DESIGN_SVG[id] ?? EXTRA_SVG[id];
+  if (!body || typeof document === 'undefined') { sprites.set(id, null); return null; }
+  const top = TOP[id] ?? 20;
+  const k = (RES * (CREATURE_HEIGHT[id] ?? 16)) / (184 - top);
+  const cv = document.createElement('canvas');
+  cv.width = Math.ceil(240 * k);
+  cv.height = Math.ceil(200 * k);
+  const spr: Sprite = { cv, k };
+  sprites.set(id, null); // null until the image is decoded -> procedural fallback meanwhile
+  const img = new Image();
+  img.onload = () => {
+    cv.getContext('2d')!.drawImage(img, 0, 0, cv.width, cv.height);
+    sprites.set(id, spr);
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" width="${cv.width}" height="${cv.height}">${body}</svg>`);
+  return null;
+}
+
+function drawSprite(g: G, spr: Sprite, id: string, x: number, y: number, facing: number, ph: number, t: number, flash: boolean, scale: number): void {
+  const unit = (CREATURE_HEIGHT[id] ?? 16) / (184 - (TOP[id] ?? 20)); // low-res px per SVG unit
+  const s = unit * scale;
+  const hover = FLOATERS.has(id);
+  const bob = hover ? Math.sin(t * 3 + ph) * 2.2 - 3 : -Math.abs(Math.sin(ph * Math.PI)) * 1.6;
+  g.save();
+  g.translate(scale > 1 ? x : Math.round(x), (scale > 1 ? y : Math.round(y)) + bob * scale);
+  if (facing < 0) g.scale(-1, 1);
+  if (flash) g.filter = 'brightness(2.4)';
+  g.imageSmoothingEnabled = true;
+  g.drawImage(spr.cv, -120 * s, -184 * s, 240 * s, 200 * s);
   g.restore();
 }
