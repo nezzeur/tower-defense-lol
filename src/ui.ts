@@ -12,6 +12,7 @@ import {
   champ, CHEST_CHOICES, isArena, unlockReason, chestPool, chestPrice, claimChest, EPIC_PITY, computeStats, enemyName, fmt, isUnlocked, level, levelCost, MAX_LEVEL, openChest,
   rewardFor, stars, teamSlots, tryLevelUp, ULT_LEVELS, ultRank,
 } from './game';
+import { chestIdleHTML, playChestOpening } from './art/chest';
 import { exportSave, importSave, persist, resetSave, store } from './save';
 import type { ChampionDef, MapDef, Stats } from './types';
 
@@ -447,7 +448,7 @@ function shopScreen(): string {
   }).join('');
   return `<div class="shop2">
     <section class="panel chest-panel">
-      <div class="chest-visual"><div class="hex-chest"><span></span></div><div class="chest-glow"></div></div>
+      <div class="chest-visual">${chestIdleHTML()}</div>
       <div class="chest-info">
         <h2>Coffre Hextech</h2>
         <p class="muted">Propose ${CHEST_CHOICES} champions que tu ne possèdes pas encore : tu en gardes un.</p>
@@ -791,10 +792,14 @@ app.addEventListener('click', (e) => {
   if (d.lvl) return levelUp(d.lvl, 1);
   if (d.lvl10) return levelUp(d.lvl10, 10);
   if (d.chest !== undefined) {
-    const art = document.querySelector('.hex-chest');
     (el as HTMLButtonElement).disabled = true;
-    art?.classList.add('opening');
-    setTimeout(() => { openChest(); persist(); render(); }, 900);
+    const got = openChest();
+    persist();
+    if (!got) return render();
+    playChestOpening(got.map((c) => ({
+      rarity: c.rarity,
+      html: `<div class="hx-img" style="background-image:url('${loadingUrl(c.id)}')"></div><b>${esc(c.name)}</b><small>${RARITY[c.rarity]}</small>`,
+    })), () => render());
     return;
   }
   if (d.claim) {
