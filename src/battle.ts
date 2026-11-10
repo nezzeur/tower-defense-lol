@@ -3,7 +3,8 @@ import { squareImage } from './art/champArt';
 import { FEATURE_INFO, featureTiles, landmarkTiles, LH, LW, pathGeometry, spawnMote, terrainAt, type Mote } from './art/mapArt';
 import { drawMapHD } from './art/mapHD';
 import { CREATURE_HEIGHT, drawCreature } from './art/creatures';
-import { shade } from './art/pixel';
+import { shade } from './art/color';
+import { sfx } from './audio';
 import { ENEMIES } from './data/enemies';
 import { COLS, ROWS } from './data/maps';
 import {
@@ -258,6 +259,7 @@ export class Battle {
     };
     this.towers.push(t);
     this.saveLayout();
+    if (this.visual) sfx('place');
     return true;
   }
 
@@ -416,6 +418,7 @@ export class Battle {
     this.spawnT = 0;
     this.waveActive = true;
     this.autoT = -1;
+    if (this.visual) sfx('wave');
     const final = this.wave === this.map.waves;
     this.showBanner(final ? 'BOSS' : `Vague ${this.wave}`, final ? ENEMIES[this.map.finalBoss].name
       : this.wave % 10 === 0 ? 'Monstre épique en approche' : this.wave % 5 === 0 ? 'Carapateurs !' : '', final ? '#c084fc' : '#f0e6d2');
@@ -564,6 +567,7 @@ export class Battle {
       e.y = p.y;
       if (e.s >= this.lanes[e.lane].len) {
         this.lives -= e.def.leak;
+        if (this.visual) sfx('lifeLost');
         this.fx.push({ kind: 'ring', x: e.x, y: e.y, r: 40, t: 0, max: 0.5, color: '#ff4d4d' });
         this.nexusHurt = 0.5;
         this.shake = Math.max(this.shake, e.def.boss ? 10 : 3);
@@ -645,6 +649,7 @@ export class Battle {
   }
 
   private shoot(t: Tower, target: Enemy, chainLeft: number): void {
+    if (this.visual) sfx('shot');
     this.projs.push({ x: t.x, y: t.y, target, tower: t, dmgMult: 1, chainLeft, hit: new Set(), trail: [] });
   }
 
@@ -688,6 +693,7 @@ export class Battle {
   }
 
   private hit(t: Tower, e: Enemy, mult: number): void {
+    if (this.visual) sfx('hit');
     const s = t.stats;
     t.hits++;
     let dmg = (s.dmg + t.runStacks) * mult;
@@ -725,6 +731,7 @@ export class Battle {
 
   private kill(e: Enemy, src: Tower | null): void {
     e.dead = true;
+    if (this.visual) sfx(e.def.boss || e.def.shape === 'boss' ? 'bossDeath' : 'death');
     this.burst(e.x, e.y, e.def.color, e.def.shape === 'boss' ? 40 : 10, e.def.shape === 'boss' ? 200 : 110, e.def.shape === 'boss' ? 4 : 2.5);
     this.burst(e.x, e.y, '#ffd84a', e.def.shape === 'boss' ? 16 : 3, 70, 2);
     const gold = Math.max(1, Math.round(e.def.gold * goldScale(this.map, this.wave) * (1 + (src?.stats.killGold ?? 0))));
@@ -761,6 +768,7 @@ export class Battle {
     persist();
     if (this.wave >= this.map.waves) {
       this.over = true;
+      if (this.visual) sfx('victory');
       this.ev.onEnd(true, this.wave);
       if (d.auto) this.autoT = 3;
     } else if (d.auto) {
@@ -773,6 +781,7 @@ export class Battle {
     this.over = true;
     this.waveActive = false;
     this.queue = [];
+    if (this.visual) sfx('defeat');
     persist();
     this.ev.onEnd(false, this.wave);
     if (store.data.auto) this.autoT = 2.5;

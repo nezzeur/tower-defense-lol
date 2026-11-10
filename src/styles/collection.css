@@ -1,0 +1,36 @@
+/* Collection: filters, champion tiles, detail panel */
+.coll-layout { display: grid; grid-template-columns: 1fr 380px; gap: 18px; align-items: start; }
+.coll-head h2 { margin-bottom: 2px; }
+.filters { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 14px; padding: 10px 12px; background: var(--fill); border: 1px solid var(--gold5); }
+.fgroup select { padding: 4px 8px; }
+.coll-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 12px; }
+.coll-card { --rc: var(--gold5); position: relative; aspect-ratio: 308 / 480; padding: 0; overflow: hidden; text-align: left; border: 2px solid var(--rc); animation: fadeUp 0.35s ease both; animation-delay: var(--d); }
+.coll-card.r2 { --rc: var(--r2); } .coll-card.r3 { --rc: var(--r3); }
+.coll-card:hover:not(:disabled) { transform: translateY(-4px); border-color: var(--gold2); }
+.coll-card.sel { border-color: var(--gold1); box-shadow: 0 0 0 1px var(--gold2), var(--glow-gold); }
+.coll-art { position: absolute; inset: 0; background-size: cover; background-position: center top; transition: transform 0.5s; }
+.coll-card:hover .coll-art { transform: scale(1.06); }
+.coll-card.locked { --rc: var(--grey1); }
+.coll-card.locked .coll-art { filter: grayscale(1) brightness(0.25) blur(1px); }
+.coll-body { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; padding: 26px 8px 8px; background: linear-gradient(transparent, rgba(1, 10, 19, 0.96) 45%); }
+.coll-body b { font: 700 13px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; }
+.coll-body span { font-size: 11px; color: var(--muted); }
+.coll-lv {
+  position: absolute; left: 6px; top: 6px; width: 28px; height: 28px; display: grid; place-items: center; font: 800 12px var(--font-body);
+  color: var(--bg0); background: linear-gradient(var(--gold1), var(--gold2)); border: 2px solid var(--bg0); outline: 1px solid var(--gold2);
+}
+.coll-role { position: absolute; right: 6px; top: 6px; width: 26px; height: 26px; display: grid; place-items: center; font-size: 13px; background: rgba(1, 10, 19, 0.9); border: 1px solid var(--gold4); }
+.coll-rank { position: absolute; left: 40px; top: 12px; color: var(--star); font-size: 10px; letter-spacing: 1px; text-shadow: 0 1px 2px #000; }
+.coll-lock { position: absolute; inset: 0; display: grid; place-items: center; font-size: 28px; opacity: 0.7; }
+.coll-detail { position: sticky; top: 70px; max-height: calc(100vh - 90px); overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.lvl-block { padding: 8px 10px; }
+.lvl-line { display: flex; justify-content: space-between; align-items: baseline; }
+.next-lv { margin-top: 4px; color: var(--muted); }
+.next-lv .up { color: var(--green); }
+.equip-row { display: flex; gap: 10px; align-items: center; }
+.item-sel { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.equip-row .item-sel { flex: 1; margin: 0; }
+.item-img { display: grid; place-items: center; flex: none; object-fit: cover; font-size: 24px; background: var(--bg2); border: 1px solid var(--gold4); box-shadow: var(--inset-line); }
+.item-slot.empty { width: 44px; height: 44px; display: grid; place-items: center; flex: none; font-size: 20px; color: var(--gold5); border: 2px dashed var(--gold5); }
+.deploy { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 1100px) { .coll-layout { grid-template-columns: 1fr; } }

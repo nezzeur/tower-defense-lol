@@ -1,5 +1,6 @@
 // Original hextech chest art (inline SVG) + fullscreen opening sequence. No external assets.
 import '../chest.css';
+import { sfx } from '../audio';
 
 let uid = 0;
 
@@ -79,6 +80,7 @@ export function playChestOpening(cards: RewardCard[], onDone: () => void): void 
   let raf = 0;
 
   const burst = () => {
+    sfx('chestBurst');
     const dpr = Math.min(2, devicePixelRatio || 1);
     cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
     const g = cv.getContext('2d')!;
@@ -108,6 +110,7 @@ export function playChestOpening(cards: RewardCard[], onDone: () => void): void 
   const reveal = () => {
     if (phase >= 3) return;
     phase = 3;
+    cards.forEach((_, i) => window.setTimeout(() => sfx('card'), 120 + i * 150));
     ov.classList.add('s-reveal');
     ov.classList.remove('s-charge');
     ov.classList.add('s-open');
@@ -124,7 +127,7 @@ export function playChestOpening(cards: RewardCard[], onDone: () => void): void 
     phase = 3;
   } else {
     ov.classList.add('s-drop'); phase = 0;
-    at(750, () => { phase = 1; ov.classList.add('s-charge'); });
+    at(750, () => { phase = 1; ov.classList.add('s-charge'); sfx('chestCharge'); });
     at(1850, () => { phase = 2; ov.classList.add('s-open'); burst(); });
     at(2300, reveal);
   }

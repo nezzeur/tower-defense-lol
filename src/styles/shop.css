@@ -1,0 +1,29 @@
+/* Shop + options */
+.shop2 { display: flex; flex-direction: column; gap: 18px; }
+.chest-panel { display: grid; grid-template-columns: 220px 1fr; gap: 24px; padding: 20px; }
+.chest-visual { position: relative; display: grid; place-items: center; min-height: 200px; }
+.chest-info h2 { margin: 0 0 4px; }
+.odds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; max-width: 520px; }
+.odd { --rc: var(--r1); display: flex; flex-direction: column; padding: 6px 10px; background: var(--bg2); border: 1px solid var(--gold5); border-top: 3px solid var(--rc); }
+.odd.r2 { --rc: var(--r2); } .odd.r3 { --rc: var(--r3); }
+.odd span { font: 700 11px var(--font-head); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.odd b { font-size: 20px; }
+.odd i { font-style: normal; font-size: 11px; color: var(--muted); }
+.pity { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 12px; }
+.pity > span { font: 700 11px var(--font-head); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold2); margin-right: 4px; }
+.pity i { width: 13px; height: 13px; transform: rotate(45deg); background: var(--bg2); border: 1px solid var(--r3); }
+.pity i.on { background: var(--r3); box-shadow: 0 0 8px var(--r3); }
+.pity b { margin-left: 6px; color: #e9d5ff; }
+.shop-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+.shop-head h2 { margin: 0; }
+.shop-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; }
+.shop-item { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; animation: fadeUp 0.35s ease both; animation-delay: var(--d); }
+.shop-item.owned { border-color: var(--teal2); }
+.si-body b { margin-right: 6px; font: 700 14px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; }
+.si-body p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.si-side { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; min-width: 130px; }
+.si-price { font: 700 16px var(--font-body); color: var(--gold3); }
+.si-holder { display: flex; gap: 6px; align-items: center; font-size: 12px; }
+.si-side select { font-size: 12px; padding: 3px 6px; max-width: 150px; }
+.options { display: grid; gap: 14px; max-width: 720px; }
+@media (max-width: 1100px) { .chest-panel { grid-template-columns: 1fr; } }

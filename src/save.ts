@@ -21,6 +21,9 @@ export interface SaveData {
   auto: boolean;
   kills: number;
   runs: number;
+  /** Master volume 0-1. */
+  volume: number;
+  muted: boolean;
 }
 
 // ?save=<name> uses a separate save slot (testing without touching real progress).
@@ -30,22 +33,30 @@ const KEY = 'riftdefenders.save.v1' + (slot ? `:${slot}` : '');
 function fresh(): SaveData {
   return {
     v: 1, gold: 0, owned: [], levels: {}, stacks: {}, items: [], equip: {}, best: {}, layouts: {},
-    chestsOpened: 0, chestOffer: null, chestsSinceEpic: 0, speed: 1, auto: false, kills: 0, runs: 0,
+    chestsOpened: 0, chestOffer: null, chestsSinceEpic: 0, speed: 1, auto: false, kills: 0, runs: 0, volume: 0.5, muted: false,
   };
 }
 
 function sanitize(raw: unknown): SaveData {
   const d = { ...fresh(), ...(raw as Partial<SaveData>) };
   if (d.v !== 1 || !Array.isArray(d.owned) || typeof d.gold !== 'number') throw new Error('bad save');
+  if (typeof d.volume !== 'number' || !(d.volume >= 0 && d.volume <= 1)) d.volume = 0.5;
+  d.muted = d.muted === true;
   return d;
 }
 
 function load(): SaveData {
+  let txt: string | null = null;
   try {
-    const txt = localStorage.getItem(KEY);
+    txt = localStorage.getItem(KEY);
     if (txt) return sanitize(JSON.parse(txt));
   } catch {
     /* corrupted or unavailable storage: start fresh */
+    if (txt) {
+      const bak = `${KEY}.backup.${Date.now()}`;
+      try { localStorage.setItem(bak, txt); } catch { /* storage full or blocked */ }
+      console.warn(`Invalid save reset to defaults; raw copy kept under "${bak}"`);
+    }
   }
   return fresh();
 }

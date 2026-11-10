@@ -1,0 +1,82 @@
+/* Atlas: world map + region panel + level cards */
+.atlas { display: grid; grid-template-columns: 1fr 360px; gap: 18px; align-items: start; }
+.world {
+  position: relative; aspect-ratio: 320 / 200; overflow: hidden; cursor: pointer; background: var(--teal3);
+  border: 1px solid var(--gold2); box-shadow: 0 0 0 1px var(--bg0), 0 0 0 3px var(--gold5);
+}
+.cam { position: absolute; inset: 0; transform-origin: 0 0; transition: transform 0.9s cubic-bezier(.2, .8, .2, 1); --inv: 1; }
+.world-img, .world-anim { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: auto; }
+.world-anim, .routes { pointer-events: none; }
+.world::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.45)); }
+.world-hud { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 8px; z-index: 2; }
+.world-hud span { background: rgba(1, 10, 19, 0.92); border: 1px solid var(--gold4); padding: 3px 10px; color: var(--gold1); font-weight: 600; }
+.routes { position: absolute; inset: 0; width: 100%; height: 100%; }
+.routes line { stroke: rgba(1, 10, 19, 0.7); stroke-width: 1.5; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.routes line.open { stroke: var(--gold2); stroke-width: 2.5; filter: drop-shadow(0 0 3px rgba(200, 170, 110, 0.8)); animation: march 1.2s linear infinite; }
+@keyframes march { to { stroke-dashoffset: -9; } }
+.region-label {
+  position: absolute; transform: translate(-50%, -50%) scale(var(--inv)); font: 700 13px var(--font-head); letter-spacing: 0.14em;
+  color: #fff; text-transform: uppercase; white-space: nowrap; pointer-events: none;
+  text-shadow: 0 2px 0 #000, 0 0 6px rgba(0, 0, 0, 0.8); transition: color 0.3s, transform 0.9s;
+}
+.region-label.deco { opacity: 0.55; font-size: 11px; }
+.region-label.on { color: var(--c); }
+
+/* Map nodes: diamond pins */
+.node {
+  position: absolute; z-index: 1; isolation: isolate; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0;
+  background: none; border: none; transform: translate(-50%, -50%) scale(var(--inv)); transition: transform 0.9s;
+}
+.node .pin { position: relative; width: 28px; height: 28px; display: grid; place-items: center; font: 700 12px var(--font-body); color: var(--bg0); transition: scale 0.15s; }
+.node .pin::before {
+  content: ''; position: absolute; inset: 3px; z-index: -1; transform: rotate(45deg); background: var(--a);
+  border: 2px solid var(--gold2); box-shadow: 0 0 0 2px var(--bg0), 0 0 10px var(--a);
+}
+.node:hover .pin { scale: 1.15; }
+.node.locked .pin::before { background: var(--grey1); border-color: var(--gold5); box-shadow: 0 0 0 2px var(--bg0); }
+.node.locked .pin { color: var(--muted); }
+.node.done .pin::before { background: var(--gold2); }
+.node.done .pin { color: var(--gold5); }
+.node .label {
+  font: 600 11px var(--font-head); letter-spacing: 0.08em; color: var(--gold1); background: rgba(1, 10, 19, 0.94); padding: 2px 8px; white-space: nowrap;
+  border: 1px solid var(--gold4); opacity: 0; transform: translateY(-2px); transition: opacity 0.2s, transform 0.2s;
+}
+.node:hover .label, .node.cur .label { opacity: 1; transform: none; }
+.node.cur::before {
+  content: ''; position: absolute; top: -14px; width: 8px; height: 8px; background: var(--teal1); transform: rotate(45deg);
+  box-shadow: 0 0 8px var(--teal1); animation: bounce 0.8s ease-in-out infinite alternate;
+}
+@keyframes bounce { to { translate: 0 -6px; } }
+
+/* Region panel */
+.region-panel { display: flex; flex-direction: column; gap: 12px; max-height: calc(100vh - 110px); overflow-y: auto; }
+.region-head { border-left: 3px solid var(--c, var(--gold2)); padding-left: 12px; animation: fadeUp 0.3s ease both; }
+.region-head h2 { margin: 6px 0 2px; color: var(--c, var(--gold1)); }
+.region-head p { margin: 0 0 8px; font-size: 13px; }
+.region-list, .level-list { display: flex; flex-direction: column; gap: 10px; }
+.region-card { position: relative; display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 12px; cursor: pointer; border-left: 3px solid var(--c); animation: fadeUp 0.35s ease both; }
+.region-card:nth-child(2) { animation-delay: 60ms; } .region-card:nth-child(3) { animation-delay: 120ms; } .region-card:nth-child(4) { animation-delay: 180ms; }
+.region-card:hover { transform: translateX(3px); }
+.region-card b { font: 700 16px var(--font-head); letter-spacing: 0.1em; text-transform: uppercase; color: var(--c); }
+.region-card.locked { filter: grayscale(0.8) brightness(0.7); }
+.cur-tag { position: absolute; right: 8px; top: 8px; background: var(--teal1); color: var(--bg0); font: 700 10px var(--font-head); letter-spacing: 0.1em; text-transform: uppercase; padding: 1px 6px; }
+.arena-tag { position: absolute; left: 8px; top: 8px; background: linear-gradient(var(--gold2), var(--gold4)); color: var(--bg0); font: 700 11px var(--font-head); letter-spacing: 0.08em; padding: 2px 8px; border: 1px solid var(--gold1); }
+
+.level-card { overflow: hidden; animation: fadeUp 0.35s ease both; }
+.level-card:nth-child(2) { animation-delay: 80ms; }
+.level-card:hover { border-color: var(--gold2); }
+.level-card.cur { border-color: var(--teal1); }
+.level-card.locked { filter: grayscale(0.7); }
+.level-thumb { position: relative; aspect-ratio: 320 / 120; overflow: hidden; border-bottom: 1px solid var(--gold5); }
+.level-thumb img { width: 100%; height: 100%; object-fit: cover; image-rendering: auto; transition: transform 0.6s; }
+.level-card:hover .level-thumb img { transform: scale(1.08); }
+.lock-veil { position: absolute; inset: 0; display: grid; place-items: center; font-size: 26px; background: rgba(1, 10, 19, 0.65); }
+.level-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+.level-title { display: flex; gap: 6px; align-items: center; font: 700 16px var(--font-head); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold1); }
+.level-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; gap: 8px; }
+.level-foot .btn.start { padding: 8px 16px; }
+.reward-chip { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+.feat-icons { display: flex; gap: 4px; margin: 2px 0; }
+.feat-icons span { width: 22px; height: 22px; display: grid; place-items: center; font-size: 12px; background: var(--bg2); border: 1px solid var(--gold5); }
+
+@media (max-width: 1000px) { .atlas { grid-template-columns: 1fr; } .region-panel { max-height: none; } }

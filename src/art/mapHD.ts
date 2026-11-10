@@ -3,7 +3,7 @@
 import { COLS, ROWS } from '../data/maps';
 import type { Landmark, MapDef, MapStyle } from '../types';
 import { featureTiles, landmarkTiles, pathGeometry, terrainAt } from './mapArt';
-import { shade } from './pixel';
+import { shade } from './color';
 
 type G = CanvasRenderingContext2D;
 

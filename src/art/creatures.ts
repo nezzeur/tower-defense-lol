@@ -1,7 +1,7 @@
 // Shaded, animated pixel creatures drawn procedurally on the low-res canvas.
 // Original designs built from generic archetypes (soldiers, crab, wolf, bird, rock golem, toad,
 // dragon, larva, serpent, furball, ghost). Local coords: feet at (0, 0), facing +x.
-import { shade } from './pixel';
+import { shade } from './color';
 import { DESIGN_SVG } from './mobDesign';
 import { EXTRA_SVG } from './mobExtra';
 

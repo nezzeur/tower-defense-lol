@@ -1,7 +1,7 @@
 // Pixel-art world map: regions of Runeterra (original illustration), drawn once,
 // plus an animated layer (waves, clouds, boats, birds, weather, region highlight).
 import { MAPS } from '../data/maps';
-import { shade } from './pixel';
+import { shade } from './color';
 
 export const WW = 320;
 export const WH = 200;

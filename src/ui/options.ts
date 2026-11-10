@@ -1,0 +1,28 @@
+import { fmt, stars } from '../game';
+import { store } from '../save';
+
+export function optionsScreen(): string {
+  const d = store.data;
+  return `<div class="options">
+    <section class="card"><h3>Son</h3>
+      <div class="row"><button class="btn" data-mute>${d.muted ? 'Son coupé' : 'Son activé'}</button>
+        <input type="range" id="opt-volume" min="0" max="100" step="1" value="${Math.round(d.volume * 100)}" aria-label="Volume">
+        <span id="opt-volume-val" class="small">${Math.round(d.volume * 100)} %</span></div>
+    </section>
+    <section class="card"><h3>Sauvegarde</h3>
+      <p class="muted small">Sauvegarde automatique dans le navigateur. Exporte régulièrement : vider les données du navigateur efface ta progression.</p>
+      <div class="row"><button class="btn" data-export>Exporter</button><button class="btn" data-copy>Copier</button></div>
+      <textarea id="save-out" readonly placeholder="Le code d'export apparaît ici"></textarea>
+      <textarea id="save-in" placeholder="Colle un code RD1... ici"></textarea>
+      <div class="row"><button class="btn" data-import>Importer</button><span id="save-msg" class="small"></span></div>
+    </section>
+    <section class="card"><h3>Statistiques</h3>
+      <ul class="stat-list"><li>Éliminations <b>${fmt(d.kills)}</b></li><li>Parties <b>${d.runs}</b></li>
+      <li>Coffres ouverts <b>${d.chestsOpened}</b></li><li>Étoiles <b>${stars()}</b></li></ul>
+    </section>
+    <section class="card danger"><h3>Zone dangereuse</h3>
+      <button class="btn red" data-reset>Réinitialiser la progression</button></section>
+    <p class="small muted">Rift Defenders est un projet de fan non officiel, gratuit et non commercial. Il n'est ni approuvé ni sponsorisé par Riot Games.
+      League of Legends et les noms associés sont des marques de Riot Games, Inc.</p>
+  </div>`;
+}
