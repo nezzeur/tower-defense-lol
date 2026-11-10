@@ -6,13 +6,14 @@ import { CREATURE_HEIGHT, drawCreature } from './art/creatures';
 import { shade } from './art/color';
 import { sfx } from './audio';
 import { ENEMIES } from './data/enemies';
+import { teamSynergies, type SynStat } from './data/synergies';
 import { COLS, ROWS } from './data/maps';
 import {
   buildWave, champ, computeStats, goldScale, hpScale, level, MAX_LIVES, START_LIVES, teamSlots, ultRank, waveBonus,
   type Spawn,
 } from './game';
 import { persist, store } from './save';
-import type { ChampionDef, EnemyDef, FeatureKind, MapDef, Stats } from './types';
+import type { ChampionDef, EnemyDef, FeatureKind, MapDef, Priority, Stats } from './types';
 
 export const TILE = 48;
 export const W = COLS * TILE;
@@ -21,7 +22,7 @@ const STEP = 1 / 60;
 
 interface Burn { dps: number; t: number; src: Tower | null }
 
-interface Enemy {
+export interface Enemy {
   uid: number;
   def: EnemyDef;
   hp: number;
@@ -57,7 +58,23 @@ export interface Tower {
   kills: number;
   /** Damage dealt this run (for the damage meter). */
   dmgDone: number;
+  /** Active ultimate: seconds left before it can be cast again. */
+  ultCd: number;
+  /** Temporary ultimate buffs (attack speed / damage fractions). */
+  buffs: { t: number; rate: number; dmg: number }[];
+  priority: Priority;
 }
+
+/** Global knob on ultimate damage multipliers (bursts, control hits, executes), tuned with scripts/sim.ts. */
+export const TUNE = { ult: 0.25 };
+
+export const PRIORITIES: Record<Priority, { name: string; desc: string }> = {
+  first: { name: 'Premier', desc: 'Le plus avancé vers le nexus' },
+  last: { name: 'Dernier', desc: 'Le moins avancé' },
+  strong: { name: 'Plus fort', desc: 'Le plus de PV' },
+  weak: { name: 'Plus faible', desc: 'Le moins de PV' },
+  close: { name: 'Proche', desc: 'Le plus proche du champion' },
+};
 
 interface Proj {
   x: number;
@@ -140,6 +157,10 @@ export class Battle {
   spellCd: Record<SpellId, number> = { smite: 0, heal: 0, exhaust: 0 };
   selectedRoster: string | null = null;
   selectedTower: Tower | null = null;
+  /** Enemy whose info panel is open. */
+  selectedEnemy: Enemy | null = null;
+  /** Team-wide region synergy bonuses (fractions), refreshed whenever the team changes. */
+  syn: Partial<Record<SynStat, number>> = {};
   private hover: { c: number; r: number } | null = null;
 
   // Visual-only state (skipped headless)
@@ -234,6 +255,12 @@ export class Battle {
     for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) {
       if (this.featureAt(c + dc, r + dr) === 'dragon') { s.dmg *= 1.15; dc = dr = 2; }
     }
+    const sy = this.syn;
+    if (sy.dmg) s.dmg *= 1 + sy.dmg;
+    if (sy.rate) s.rate *= 1 + sy.rate;
+    if (sy.range) s.range *= 1 + sy.range;
+    if (sy.slow && s.slow) s.slow.pct += sy.slow;
+    if (sy.splash && s.type === 'splash') s.splash *= 1 + sy.splash;
     return s;
   }
 
@@ -256,8 +283,10 @@ export class Battle {
     const t: Tower = {
       def, c, r, x: (c + 0.5) * TILE, y: (r + 0.5) * TILE, stats: this.statsAt(def, c, r), cd: 0.3,
       hits: 0, runStacks: 0, ramp: 0, angle: 0, flash: 0, kills: 0, dmgDone: 0,
+      ultCd: def.active.cd, buffs: [], priority: store.data.priorities[id] ?? 'first',
     };
     this.towers.push(t);
+    this.refreshStats();
     this.saveLayout();
     if (this.visual) sfx('place');
     return true;
@@ -266,11 +295,23 @@ export class Battle {
   remove(t: Tower): void {
     this.towers = this.towers.filter((x) => x !== t);
     if (this.selectedTower === t) this.selectedTower = null;
+    this.refreshStats();
     this.saveLayout();
   }
 
+  /** Recomputes region synergies, then every champion's stats. */
   refreshStats(): void {
+    this.syn = {};
+    for (const a of teamSynergies(this.towers.map((x) => x.def.region))) {
+      if (a.tier) this.syn[a.def.stat] = (this.syn[a.def.stat] ?? 0) + a.value;
+    }
     for (const t of this.towers) t.stats = this.statsAt(t.def, t.c, t.r);
+  }
+
+  setPriority(t: Tower, p: Priority): void {
+    t.priority = p;
+    if (p === 'first') delete store.data.priorities[t.def.id]; else store.data.priorities[t.def.id] = p;
+    persist();
   }
 
   private saveLayout(): void {
@@ -293,6 +334,23 @@ export class Battle {
     const x = ((cx - rect.left) / rect.width) * W;
     const y = ((cy - rect.top) / rect.height) * H;
     return { c: Math.floor(x / TILE), r: Math.floor(y / TILE) };
+  }
+
+  /** Canvas-space point under a client point (no bounds check). */
+  private pointAtClient(cx: number, cy: number): { x: number; y: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    return { x: ((cx - rect.left) / rect.width) * W, y: ((cy - rect.top) / rect.height) * H };
+  }
+
+  /** Front-most living enemy whose sprite covers a canvas point. */
+  enemyAtPoint(x: number, y: number): Enemy | null {
+    let best: Enemy | null = null;
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      const h = Math.max(30, (CREATURE_HEIGHT[e.def.id] ?? 16) * 3), w = Math.max(30, h * 0.9), base = e.y + 15;
+      if (Math.abs(x - e.x) <= w / 2 && y >= base - h && y <= base + 8 && (!best || e.y > best.y)) best = e;
+    }
+    return best;
   }
 
   /** Placement preview while dragging from outside the canvas. */
@@ -336,6 +394,7 @@ export class Battle {
       if (drag && !this.dragging && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) {
         this.dragging = drag.t;
         this.selectedTower = drag.t;
+        this.selectedEnemy = null;
         this.ev.onChange();
       }
       cursor();
@@ -367,6 +426,7 @@ export class Battle {
       e.preventDefault();
       this.selectedRoster = null;
       this.selectedTower = null;
+      this.selectedEnemy = null;
       this.ev.onChange();
     });
   }
@@ -382,7 +442,10 @@ export class Battle {
       this.dropChampion(this.selectedRoster, c, r);
       return;
     }
+    const pt = this.pointAtClient(e.clientX, e.clientY);
+    const foe = hit ? null : this.enemyAtPoint(pt.x, pt.y);
     this.selectedTower = hit ?? null;
+    this.selectedEnemy = foe;
     this.selectedRoster = null;
     this.ev.onChange();
   }
@@ -448,7 +511,8 @@ export class Battle {
     this.waveActive = false;
     this.over = false;
     this.spellCd = { smite: 0, heal: 0, exhaust: 0 };
-    for (const t of this.towers) { t.runStacks = 0; t.ramp = 0; t.hits = 0; t.cd = 0.3; t.dmgDone = 0; t.kills = 0; }
+    this.selectedEnemy = null;
+    for (const t of this.towers) { t.ultCd = t.def.active.cd; t.buffs = []; t.runStacks = 0; t.ramp = 0; t.hits = 0; t.cd = 0.3; t.dmgDone = 0; t.kills = 0; }
     this.runKills = this.runGold = this.runTime = 0;
     this.spawnCount = 0;
     for (const tu of this.turrets) tu.cd = 0;
@@ -472,6 +536,123 @@ export class Battle {
       this.lives = Math.min(MAX_LIVES, this.lives + 5);
     }
     this.spellCd[id] = SPELLS[id].cd;
+  }
+
+  // ---------- Active ultimates ----------
+
+  ultReady(t: Tower): boolean {
+    return !this.over && t.ultCd <= 0;
+  }
+
+  /** Centre of the densest group of enemies within radius tiles (ties go to the one furthest along). */
+  private densest(list: Enemy[], radius: number): { x: number; y: number } {
+    const r = radius * TILE;
+    let best = list[0], bn = -1;
+    for (const a of list) {
+      let n = 0;
+      for (const b of list) if (Math.hypot(a.x - b.x, a.y - b.y) <= r) n++;
+      if (n > bn || (n === bn && a.s > best.s)) { best = a; bn = n; }
+    }
+    return { x: best.x, y: best.y };
+  }
+
+  private addBurn(e: Enemy, dps: number, dur: number, src: Tower): void {
+    if (e.dead) return;
+    if (e.burns.length >= 6) e.burns.shift();
+    e.burns.push({ dps, t: dur, src });
+  }
+
+  /** Casts the champion's active ultimate; false when it is on cooldown or has nothing to act on. */
+  castUlt(t: Tower): boolean {
+    if (!this.ultReady(t)) return false;
+    const u = t.def.active, fx = u.fx;
+    const alive = this.enemies.filter((e) => !e.dead);
+    const dmg = (t.stats.dmg + t.runStacks) * TUNE.ult;
+    const vis = this.visual;
+    if (fx.kind === 'gold') {
+      if (!this.waveActive) return false;
+      const g = Math.max(1, Math.round(waveBonus(this.map, Math.max(1, this.wave)) * fx.mult));
+      store.data.gold += g;
+      this.runGold += g;
+      if (vis) this.fx.push({ kind: 'text', x: t.x, y: t.y - 36, t: 0, max: 1, color: '#f5c542', text: `+${fmtShort(g)}` });
+    } else if (fx.kind === 'lives') {
+      if (this.lives >= MAX_LIVES) return false;
+      this.lives = Math.min(MAX_LIVES, this.lives + fx.n);
+      const end = this.pts[this.pts.length - 1];
+      if (vis) this.fx.push({ kind: 'ring', x: end.x, y: end.y, r: 70, t: 0, max: 0.9, color: '#6be08a' });
+    } else if (!alive.length) {
+      return false;
+    } else if (fx.kind === 'burst') {
+      const c = this.densest(alive, fx.radius), r = fx.radius * TILE;
+      for (const e of alive) {
+        if (Math.hypot(e.x - c.x, e.y - c.y) > r + e.def.size) continue;
+        this.damage(e, dmg * fx.mult, t, false);
+        if (fx.burn) this.addBurn(e, dmg * fx.burn.mult, fx.burn.dur, t);
+      }
+      if (vis) {
+        this.fx.push({ kind: 'boom', x: c.x, y: c.y, r: r * 1.15, t: 0, max: 0.55, color: t.def.color });
+        this.fx.push({ kind: 'ring', x: c.x, y: c.y, r: r * 1.3, t: 0, max: 0.7, color: '#ffffff' });
+        this.burst(c.x, c.y, t.def.color, 36, 220, 3.5);
+        this.shake = Math.max(this.shake, 6);
+      }
+    } else if (fx.kind === 'control') {
+      const c = fx.radius ? this.densest(alive, fx.radius) : null, r = (fx.radius ?? 0) * TILE;
+      for (const e of alive) {
+        if (c && Math.hypot(e.x - c.x, e.y - c.y) > r + e.def.size) continue;
+        if (fx.slow) { e.slowPct = Math.max(e.slowPct, fx.slow); e.slowT = Math.max(e.slowT, fx.slowDur ?? 3); }
+        if (fx.stun) e.stunT = Math.max(e.stunT, fx.stun * (e.def.boss ? 0.3 : 1));
+        if (fx.mult) this.damage(e, dmg * fx.mult, t, false);
+      }
+      if (vis) {
+        const cx = c?.x ?? W / 2, cy = c?.y ?? H / 2, rr = c ? r * 1.2 : W * 0.6;
+        this.fx.push({ kind: 'ring', x: cx, y: cy, r: rr, t: 0, max: 0.8, color: t.def.color });
+        this.fx.push({ kind: 'boom', x: cx, y: cy, r: rr * 0.8, t: 0, max: 0.5, color: t.def.color });
+        this.shake = Math.max(this.shake, 3);
+      }
+    } else if (fx.kind === 'buff') {
+      const r = (fx.radius ?? 0) * TILE;
+      for (const o of this.towers) {
+        if (fx.scope === 'self' && o !== t) continue;
+        if (fx.scope === 'near' && Math.hypot(o.x - t.x, o.y - t.y) > r) continue;
+        o.buffs.push({ t: fx.dur, rate: fx.rate ?? 0, dmg: fx.dmg ?? 0 });
+        if (vis) {
+          this.fx.push({ kind: 'ring', x: o.x, y: o.y, r: 44, t: 0, max: 0.8, color: t.def.color });
+          this.burst(o.x, o.y, t.def.color, 14, 110, 2.5);
+        }
+      }
+      if (vis && fx.scope === 'near') this.fx.push({ kind: 'ring', x: t.x, y: t.y, r, t: 0, max: 0.6, color: t.def.color });
+    } else {
+      const target = alive.reduce((a, b) => (b.hp > a.hp ? b : a));
+      const boss = target.def.boss ? t.stats.bossMult ?? 1 : 1;
+      this.damage(target, dmg * fx.mult * boss, t, false);
+      this.damage(target, target.maxHp * fx.pct * (target.def.boss ? 0.5 : 1), t, true);
+      if (vis) {
+        this.fx.push({ kind: 'beam', x: t.x, y: t.y, x2: target.x, y2: target.y, t: 0, max: 0.3, color: t.def.color });
+        this.fx.push({ kind: 'boom', x: target.x, y: target.y, r: 46, t: 0, max: 0.45, color: t.def.color });
+        this.burst(target.x, target.y, t.def.color, 24, 180, 3);
+        this.shake = Math.max(this.shake, 4);
+      }
+    }
+    t.ultCd = u.cd;
+    t.flash = 0.3;
+    if (vis) {
+      this.fx.push({ kind: 'text', x: t.x, y: t.y - 34, t: 0, max: 1.1, color: '#ffd84a', text: u.name });
+      sfx('ult');
+    }
+    return true;
+  }
+
+  private sortTargets(list: Enemy[], t: Tower): Enemy[] {
+    switch (t.priority) {
+      case 'last': return list.sort((a, b) => a.s - b.s);
+      case 'strong': return list.sort((a, b) => b.hp - a.hp);
+      case 'weak': return list.sort((a, b) => a.hp - b.hp);
+      case 'close': {
+        const d = (e: Enemy) => Math.hypot(e.x - t.x, e.y - t.y);
+        return list.sort((a, b) => d(a) - d(b));
+      }
+      default: return list.sort((a, b) => b.s - a.s);
+    }
   }
 
   // ---------- Loop ----------
@@ -501,6 +682,8 @@ export class Battle {
 
   step(dt: number): void {
     for (const k of Object.keys(this.spellCd) as SpellId[]) this.spellCd[k] = Math.max(0, this.spellCd[k] - dt);
+    const charge = dt * (1 + (this.syn.ultCd ?? 0));
+    for (const t of this.towers) t.ultCd = Math.max(0, t.ultCd - charge);
     this.saveT += dt;
     if (this.saveT > 10) { this.saveT = 0; persist(); }
 
@@ -531,6 +714,7 @@ export class Battle {
     for (const f of this.fx) f.t += dt;
     this.fx = this.fx.filter((f) => f.t < f.max);
     this.enemies = this.enemies.filter((e) => !e.dead);
+    if (this.selectedEnemy?.dead) this.selectedEnemy = null;
 
     if (this.waveActive && !this.queue.length && !this.enemies.length && !this.over) this.waveCleared();
   }
@@ -604,11 +788,12 @@ export class Battle {
   private updateTowers(dt: number): void {
     for (const t of this.towers) {
       t.flash = Math.max(0, t.flash - dt);
+      if (t.buffs.length) { for (const b of t.buffs) b.t -= dt; t.buffs = t.buffs.filter((b) => b.t > 0); }
       const s = t.stats;
-      const rate = s.rate * (1 + t.ramp);
+      const rate = s.rate * (1 + t.ramp) * (1 + t.buffs.reduce((n, b) => n + b.rate, 0));
       t.cd -= dt;
       if (t.cd > 0) continue;
-      const targets = this.inRange(t).sort((a, b) => b.s - a.s);
+      const targets = this.sortTargets(this.inRange(t), t);
       if (!targets.length) {
         if (s.ramp) t.ramp = Math.max(0, t.ramp - dt * 0.5);
         t.cd = 0;
@@ -701,6 +886,8 @@ export class Battle {
     if (s.everyN && t.hits % s.everyN.n === 0) { dmg *= s.everyN.mult; crit = true; }
     if (s.crit && Math.random() < s.crit.chance) { dmg *= s.crit.mult; crit = true; }
     if (e.def.boss && s.bossMult) dmg *= s.bossMult;
+    if (e.def.boss && this.syn.boss) dmg *= 1 + this.syn.boss;
+    if (t.buffs.length) dmg *= 1 + t.buffs.reduce((n, b) => n + b.dmg, 0);
     if (crit) this.fx.push({ kind: 'text', x: e.x, y: e.y - 14, t: 0, max: 0.6, color: '#ffd84a', text: fmtShort(dmg) });
     this.damage(e, dmg, t, false);
     if (s.pctHp && t.hits % s.pctHp.every === 0) this.damage(e, e.maxHp * s.pctHp.pct, t, true);
@@ -723,7 +910,7 @@ export class Battle {
 
   private damage(e: Enemy, amount: number, src: Tower | null, trueDmg: boolean): void {
     if (e.dead) return;
-    const dealt = trueDmg ? amount : amount * (1 - e.def.armor);
+    const dealt = trueDmg ? amount : amount * (1 - Math.max(0, e.def.armor - (this.syn.armorShred ?? 0)));
     if (src) src.dmgDone += Math.min(dealt, Math.max(0, e.hp));
     e.hp -= dealt;
     if (e.hp <= 0) this.kill(e, src);
@@ -734,7 +921,7 @@ export class Battle {
     if (this.visual) sfx(e.def.boss || e.def.shape === 'boss' ? 'bossDeath' : 'death');
     this.burst(e.x, e.y, e.def.color, e.def.shape === 'boss' ? 40 : 10, e.def.shape === 'boss' ? 200 : 110, e.def.shape === 'boss' ? 4 : 2.5);
     this.burst(e.x, e.y, '#ffd84a', e.def.shape === 'boss' ? 16 : 3, 70, 2);
-    const gold = Math.max(1, Math.round(e.def.gold * goldScale(this.map, this.wave) * (1 + (src?.stats.killGold ?? 0))));
+    const gold = Math.max(1, Math.round(e.def.gold * goldScale(this.map, this.wave) * (1 + (src?.stats.killGold ?? 0) + (this.syn.gold ?? 0))));
     store.data.gold += gold;
     store.data.kills++;
     this.runKills++;
@@ -786,6 +973,11 @@ export class Battle {
     this.ev.onEnd(false, this.wave);
     if (store.data.auto) this.autoT = 2.5;
     this.ev.onChange();
+  }
+
+  /** Gold an enemy pays on a normal kill (the info panel shows it). */
+  enemyReward(e: Enemy): number {
+    return Math.max(1, Math.round(e.def.gold * goldScale(this.map, this.wave) * (1 + (this.syn.gold ?? 0))));
   }
 
   // ---------- Render (HD) ----------
@@ -1118,6 +1310,17 @@ export class Battle {
     g.beginPath();
     g.ellipse(x, y, w * 0.38, Math.max(4, w * 0.1), 0, 0, Math.PI * 2);
     g.fill();
+    if (e === this.selectedEnemy) {
+      const pulse = 1 + Math.sin(this.clock * 5) * 0.06;
+      g.strokeStyle = '#ffd84a';
+      g.shadowColor = '#ffd84a';
+      g.shadowBlur = 10;
+      g.lineWidth = 2.5;
+      g.beginPath();
+      g.ellipse(x, y, w * 0.5 * pulse, Math.max(6, w * 0.15) * pulse, 0, 0, Math.PI * 2);
+      g.stroke();
+      g.shadowBlur = 0;
+    }
     const custom = mobImage(e.def.id);
     if (custom) {
       const ih = h, iw = (custom.naturalWidth / custom.naturalHeight) * ih;
@@ -1237,6 +1440,42 @@ export class Battle {
     g.font = '700 9px Inter, sans-serif';
     g.textAlign = 'center';
     g.fillText(String(lvl), x + 15, y + 18);
+    // Active ultimate: charge arc, pulsing ring + R badge when ready
+    const u = t.def.active;
+    if (t.ultCd <= 0) {
+      g.strokeStyle = '#ffd84a';
+      g.shadowColor = '#ffd84a';
+      g.shadowBlur = 8 + Math.sin(this.clock * 6) * 4;
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(x, y, R + 8, 0, Math.PI * 2);
+      g.stroke();
+      g.shadowBlur = 0;
+      g.fillStyle = '#ffd84a';
+      g.beginPath();
+      g.arc(x - 15, y - 15, 7, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#010a13';
+      g.font = '800 9px Inter, sans-serif';
+      g.textAlign = 'center';
+      g.fillText('R', x - 15, y - 12);
+    } else {
+      g.strokeStyle = 'rgba(10,200,185,0.8)';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(x, y, R + 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - t.ultCd / u.cd));
+      g.stroke();
+    }
+    if (t.buffs.length) {
+      g.strokeStyle = 'rgba(255,216,74,0.6)';
+      g.lineWidth = 3;
+      g.setLineDash([4, 4]);
+      g.lineDashOffset = -this.clock * 20;
+      g.beginPath();
+      g.arc(x, y, R + 12, 0, Math.PI * 2);
+      g.stroke();
+      g.setLineDash([]);
+    }
     // Ult rank gems
     for (let i = 0; i < rank; i++) {
       const sx = x - (rank - 1) * 7 + i * 14, sy = y - R - 9;

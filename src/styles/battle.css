@@ -122,3 +122,38 @@
 
 @media (max-width: 1200px) { .bmain { grid-template-columns: 1fr; } .hud-panel { max-height: none; } }
 @media (max-width: 900px) { .battle { height: auto; } .speed { margin-left: 0; } }
+
+/* Active ultimates, synergies, enemy card */
+.ults { display: flex; gap: 8px; margin-bottom: 8px; min-height: 0; }
+.ults:empty { display: none; }
+.ult-btn {
+  --p: 360deg; position: relative; width: 46px; height: 46px; flex: none; padding: 0; overflow: hidden; border-radius: 50%;
+  background: var(--bg2); border: 2px solid var(--gold4); display: grid; place-items: center;
+}
+.ult-btn img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.ult-btn .ini { font-weight: 800; color: var(--gold1); }
+.ult-btn .sweep { position: absolute; inset: 0; pointer-events: none; background: conic-gradient(transparent var(--p), rgba(1, 10, 19, 0.72) 0); }
+.ult-btn.ready .sweep { background: none; }
+.ult-btn .cdn { position: absolute; inset: 0; display: grid; place-items: center; font: normal 800 15px var(--font-body); color: #fff; text-shadow: 0 0 4px #000; }
+.ult-btn kbd { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); padding: 0 4px; line-height: 13px; font-size: 10px; background: var(--bg0); }
+.ult-btn:disabled { opacity: 1; filter: grayscale(0.5); }
+.ult-btn.ready { border-color: var(--star); box-shadow: 0 0 0 1px var(--bg0), 0 0 12px var(--star); animation: ultpulse 1.2s ease-in-out infinite; }
+@keyframes ultpulse { 50% { box-shadow: 0 0 0 1px var(--bg0), 0 0 4px var(--star); } }
+.ult-big { --p: 0%; width: 100%; margin: 4px 0; background: linear-gradient(90deg, var(--teal3) var(--p), var(--bg2) 0); border-color: var(--gold4); }
+.ult-big.ready { background: linear-gradient(var(--gold2), var(--gold4)); color: var(--bg0); }
+.ab.act { border-left-color: var(--star); }
+.cdtag { color: var(--teal1); }
+.syn { margin-bottom: 6px; padding: 4px 8px; background: var(--bg2); border: 1px solid var(--gold5); border-left: 3px solid var(--grey2); color: var(--muted); cursor: help; }
+.syn.on { border-left-color: var(--teal1); color: var(--text); }
+.syn-h { display: flex; align-items: center; gap: 8px; }
+.syn-h b { flex: 1; }
+.syn-h em { font-style: normal; font-weight: 700; color: var(--gold2); }
+.pips { display: flex; gap: 3px; }
+.pips i { width: 8px; height: 8px; transform: rotate(45deg); background: var(--bg0); border: 1px solid var(--gold4); }
+.pips i.on { background: var(--teal1); border-color: var(--teal0); }
+.enemy-card .mi-boss { margin-top: 0; }
+.enemy-card .btn { width: 100%; margin-top: 6px; }
+.st-slow { color: var(--teal0); border-color: var(--teal2); }
+.st-stun { color: var(--star); border-color: var(--gold3); }
+.st-burn { color: var(--red); border-color: var(--red); }
+.syn-info { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; padding: 6px 10px; background: var(--bg2); border: 1px solid var(--gold5); border-left: 3px solid var(--teal1); }

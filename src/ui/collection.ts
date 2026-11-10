@@ -3,6 +3,7 @@ import { CHAMPIONS } from '../data/champions';
 import { ITEMS, ITEM_BY_ID } from '../data/items';
 import { MAPS, MAP_BY_ID } from '../data/maps';
 import { champ, computeStats, fmt, level, MAX_LEVEL, ULT_LEVELS, ultRank } from '../game';
+import { SYNERGIES, SYN_TIERS, synText } from '../data/synergies';
 import { store } from '../save';
 import type { ChampionDef } from '../types';
 import { abilityRow, chip, esc, itemIcon, itemSelect, levelButtons, RARITY, ROLE_ICON, statLines, ui } from './common';
@@ -55,6 +56,15 @@ export function champsScreen(): string {
   </div>`;
 }
 
+function synergyInfo(def: ChampionDef): string {
+  const sy = SYNERGIES[def.region];
+  const mates = CHAMPIONS.filter((c) => c.region === def.region).length;
+  if (!sy) return `<div class="syn-info"><b>${esc(def.region)}</b><span class="small muted">Pas de synergie de région (un seul champion).</span></div>`;
+  return `<div class="syn-info"><b>${esc(def.region)} — ${esc(sy.name)}</b>
+    ${SYN_TIERS.map((t) => `<span class="small"><kbd>${t.n}${t.n === 4 ? '+' : ''}</kbd> ${esc(synText(sy, t.v))}</span>`).join('')}
+    <span class="small muted">${mates} champion${mates > 1 ? 's' : ''} de cette région dans le jeu</span></div>`;
+}
+
 function champDetail(def: ChampionDef): string {
   const lvl = level(def.id);
   const s = computeStats(def);
@@ -70,6 +80,7 @@ function champDetail(def: ChampionDef): string {
       <div class="cc-tags"><span class="tagc role">${ROLE_ICON[def.role]} ${def.role}</span><span class="tagc">${def.region}</span>
         <span class="tagc rar r${def.rarity}">${RARITY[def.rarity]}</span></div>
     </div>
+    ${synergyInfo(def)}
     <div class="lvl-block">
       <div class="lvl-line"><span>Niveau <b>${lvl}</b> / ${MAX_LEVEL}</span><span class="muted small">Ultime : ${ULT_LEVELS.map((l) => (lvl >= l ? `<b>${l}</b>` : l)).join(' · ')}</span></div>
       <div class="progress"><div style="width:${(lvl / MAX_LEVEL) * 100}%"></div></div>

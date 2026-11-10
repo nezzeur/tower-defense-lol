@@ -33,6 +33,32 @@ export interface Stats {
   bossMult?: number;
 }
 
+/** How a placed champion picks among the enemies in range. */
+export type Priority = 'first' | 'last' | 'strong' | 'weak' | 'close';
+
+/** Effect of an active ultimate (generic building blocks, scaled by the caster's damage). */
+export type UltFx =
+  /** Damage (x caster damage) to every enemy around the densest cluster, optional burn. */
+  | { kind: 'burst'; radius: number; mult: number; burn?: { mult: number; dur: number } }
+  /** Slow / stun (and optional damage) on a cluster (radius in tiles) or on every enemy (no radius). */
+  | { kind: 'control'; radius?: number; slow?: number; slowDur?: number; stun?: number; mult?: number }
+  /** Attack speed / damage buff for dur seconds on self, allies within radius tiles, or the whole team. */
+  | { kind: 'buff'; scope: 'self' | 'near' | 'team'; radius?: number; rate?: number; dmg?: number; dur: number }
+  /** Big hit on the toughest enemy: mult x damage plus pct of its max HP as true damage. */
+  | { kind: 'execute'; mult: number; pct: number }
+  /** Instant gold: mult x the current wave bonus. */
+  | { kind: 'gold'; mult: number }
+  | { kind: 'lives'; n: number };
+
+/** Active ultimate: cast by the player, recharges while the champion is on the board. */
+export interface ActiveUlt {
+  name: string;
+  desc: string;
+  /** Cooldown in game seconds. */
+  cd: number;
+  fx: UltFx;
+}
+
 export interface ChampionDef {
   id: string;
   name: string;
@@ -47,7 +73,10 @@ export interface ChampionDef {
   reward?: string;
   passive: string;
   base: Stats;
+  /** Passive upgrade unlocked at levels 6 / 11 / 16 ("ult rank"). */
   ult: { name: string; desc: string; apply: (s: Stats, rank: number) => void };
+  /** Active ultimate. */
+  active: ActiveUlt;
 }
 
 export interface EnemyDef {

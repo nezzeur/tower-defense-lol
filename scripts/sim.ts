@@ -1,7 +1,7 @@
 // Balance simulation: a greedy bot plays the real engine headless from a fresh save
 // and reports how long (in x1 game time) each progression milestone takes.
 // Usage: npx tsx scripts/sim.ts [starter] [maxHours]
-import { Battle, TILE } from '../src/battle';
+import { Battle, TILE, TUNE } from '../src/battle';
 import { CHAMPIONS } from '../src/data/champions';
 import { ITEMS } from '../src/data/items';
 import { applyCurve, COLS, MAP_CURVE, MAPS, ROWS } from '../src/data/maps';
@@ -18,7 +18,8 @@ const WAVE_GAP = 2;
 const starter = process.argv[2] ?? 'ashe';
 const maxHours = Number(process.argv[3] ?? 30);
 
-// Sweep overrides: BAL='{"dmgPerLevel":1.07}' GROWTH=1.2 BASE=1.5
+// Sweep overrides (ULT=<factor> scales active ultimates, 0 = never cast): BAL='{"dmgPerLevel":1.07}' GROWTH=1.2 BASE=1.5
+if (process.env.ULT) TUNE.ult = Number(process.env.ULT);
 Object.assign(BALANCE, JSON.parse(process.env.BAL ?? '{}'));
 if (process.env.GROWTH) { MAP_CURVE.growth = Number(process.env.GROWTH); applyCurve(); }
 if (process.env.BASE) { MAP_CURVE.base = Number(process.env.BASE); applyCurve(); }
@@ -113,6 +114,7 @@ function useSpells(b: Battle): void {
   if (b.spellCd.smite <= 0) b.castSpell('smite');
   if (b.spellCd.exhaust <= 0 && b.enemies.some((e) => e.s > any.pathLen * 0.7)) b.castSpell('exhaust');
   if (b.spellCd.heal <= 0 && b.lives < 12) b.castSpell('heal');
+  if (TUNE.ult > 0) for (const t of b.towers) if (b.ultReady(t)) b.castUlt(t);
 }
 
 function play(m: MapDef, boss = false): { wave: number; win: boolean } {

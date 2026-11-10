@@ -4,6 +4,7 @@ import { champ, claimChest, openChest, level, teamSlots, tryLevelUp, ULT_LEVELS,
 import { playChestOpening } from '../art/chest';
 import { applyVolume, sfx } from '../audio';
 import type { SpellId } from '../battle';
+import type { Priority } from '../types';
 import { exportSave, importSave, persist, resetSave, store } from '../save';
 import { selectRegion } from './atlas';
 import { leaveBattle, refreshLive, renderSide, startBattle } from './battleHud';
@@ -124,6 +125,8 @@ app.addEventListener('click', (e) => {
     else flash(`Tous les emplacements sont pris (${teamSlots()}). Retire un champion ou gagne des ★.`);
     return renderSide();
   }
+  if (d.ult) { const t = b.towers.find((x) => x.def.id === d.ult); if (t) b.castUlt(t); return refreshLive(); }
+  if (d.deselectEnemy !== undefined) { b.selectedEnemy = null; return renderSide(); }
   if (d.deselect !== undefined) { b.selectedTower = null; return renderSide(); }
   if (d.remove !== undefined && b.selectedTower) { b.remove(b.selectedTower); return renderSide(); }
 });
@@ -158,6 +161,11 @@ app.addEventListener('change', (e) => {
     else for (const [c, it] of Object.entries(store.data.equip)) if (it === el.dataset.equipItem) delete store.data.equip[c];
     persist();
     render();
+    return;
+  }
+  if (el.dataset.prio && ui.battle) {
+    const t = ui.battle.towers.find((x) => x.def.id === el.dataset.prio);
+    if (t) ui.battle.setPriority(t, el.value as Priority);
     return;
   }
   const champId = el.dataset.equip;
@@ -212,7 +220,11 @@ window.addEventListener('pointerup', (e) => {
 window.addEventListener('keydown', (e) => {
   if (!ui.battle || (e.target as HTMLElement).tagName === 'INPUT') return;
   if (e.code === 'Space') { e.preventDefault(); if (ui.battle.towers.length) ui.battle.startWave(); }
-  if (e.key === 'Escape') { ui.battle.selectedRoster = null; ui.battle.selectedTower = null; renderSide(); }
+  if (e.key === 'Escape') { ui.battle.selectedRoster = null; ui.battle.selectedTower = null; ui.battle.selectedEnemy = null; renderSide(); }
+  if (/^[1-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const t = ui.battle.towers[Number(e.key) - 1];
+    if (t && ui.battle.castUlt(t)) refreshLive();
+  }
   if (e.key === 'p') ui.battle.paused = !ui.battle.paused;
 });
 

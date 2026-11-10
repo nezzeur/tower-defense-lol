@@ -24,4 +24,8 @@ Personal, local-only LoL-themed tower defense (PokéPath-like progression). Orig
 - 5 regions ("villes"): Faille 5 maps, Demacia 6, Freljord 7, Noxus 8, Ionia 9. Regular maps 30 waves, last map = arena (40). 3★ on previous map opens next; arena opens next region.
 - Difficulty `mult = 1.5 * 1.24^index * laneFactor`; bot clears all in ~12h (most regular maps cleared first try).
 - Shurima, Piltover, Shadow Isles shelved (hand maps kept in `HAND`, decorative on atlas).
-- Ideas queued: active ultimates, region synergies, target priority, enemy info on click, sound, new regions.
+- Active ultimates: `ChampionDef.active` (cd 40-80s, effect `UltFx`: burst/control/buff/execute/gold/lives), cast from HUD buttons or keys 1-9; `Battle.castUlt`; damage scaled by `TUNE.ult` (0.25, sim-tuned). `def.ult` = passive upgrade at levels 6/11/16 ("Rang d'ultime").
+- Region synergies (`src/data/synergies.ts`): 2/3/4+ same-region placed champions give +5/10/18 % (Demacia armor shred, Freljord slow, Noxus dmg, Ionia rate, Piltover range, Zaun splash, Bilgewater gold, Bandle ult recharge, Néant boss dmg).
+- Target priority per champion (`Tower.priority`, save `priorities`); enemy click shows an info card (`Battle.selectedEnemy`).
+- Sim with all this: bot clears everything in ~10h (was ~12-13h); the bot casts ults instantly, humans will be slower. `ULT=<x>` env scales/disables ults in the sim.
+- Ideas queued: manual ult aiming, auto-cast option, more regions, enemy traits (flying, resists).

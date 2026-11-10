@@ -132,8 +132,17 @@ export function abilityRow(def: ChampionDef): string {
     src ? `<img class="abil ${cls}" src="${src}" alt="">` : `<span class="abil ${cls} ph">${fallback}</span>`;
   return `<div class="abilities">
     <div class="ab">${ico(icons?.passive, 'P', 'p')}<div><b>${esc(icons?.passiveName ?? 'Passif')}</b><span>${esc(def.passive)}</span></div></div>
-    <div class="ab ${rank ? '' : 'off'}">${ico(icons?.ult, 'R', 'r')}<div><b>${esc(def.ult.name)} <i>${ULT_LEVELS.map((l, i) => `<em class="${i < rank ? 'on' : ''}">${l}</em>`).join('')}</i></b><span>${esc(def.ult.desc)}</span></div></div>
+    <div class="ab act">${ico(icons?.ult, 'R', 'r')}<div><b>${esc(def.active.name)} <i class="cdtag">${def.active.cd} s</i></b><span>${esc(def.active.desc)}</span></div></div>
+    <div class="ab ${rank ? '' : 'off'}">${ico(undefined, '★', 'r')}<div><b>Rang d'ultime <i>${ULT_LEVELS.map((l, i) => `<em class="${i < rank ? 'on' : ''}">${l}</em>`).join('')}</i></b><span>${esc(def.ult.desc)}</span></div></div>
   </div>`;
+}
+
+/** Round ultimate button (battle HUD): icon, cooldown sweep and key hint filled in by refreshLive. */
+export function ultButton(def: ChampionDef, attrs: string, key?: number): string {
+  const icons = abilityIcons(def.id, () => { if (ui.battle) renderSide(); });
+  const img = icons?.ult ? `<img src="${icons.ult}" alt="" draggable="false">` : `<span class="ini">${initials(def.name)}</span>`;
+  return `<button class="ult-btn" ${attrs} data-ult-btn="${def.id}" title="${esc(def.active.name)} — ${esc(def.active.desc)} (${def.active.cd} s)">
+    ${img}<span class="sweep"></span><i class="cdn"></i>${key ? `<kbd>${key}</kbd>` : ''}</button>`;
 }
 
 export function flash(msg: string): void {

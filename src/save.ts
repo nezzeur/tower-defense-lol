@@ -1,3 +1,5 @@
+import type { Priority } from './types';
+
 export interface Placement { id: string; c: number; r: number }
 
 export interface SaveData {
@@ -17,6 +19,8 @@ export interface SaveData {
   /** Pending chest choice (champion ids); kept in the save so a reload can't reroll it. */
   chestOffer: string[] | null;
   chestsSinceEpic: number;
+  /** Targeting priority per champion (default 'first'). */
+  priorities: Record<string, Priority>;
   speed: number;
   auto: boolean;
   kills: number;
@@ -32,7 +36,7 @@ const KEY = 'riftdefenders.save.v1' + (slot ? `:${slot}` : '');
 
 function fresh(): SaveData {
   return {
-    v: 1, gold: 0, owned: [], levels: {}, stacks: {}, items: [], equip: {}, best: {}, layouts: {},
+    v: 1, gold: 0, owned: [], levels: {}, stacks: {}, items: [], equip: {}, best: {}, layouts: {}, priorities: {},
     chestsOpened: 0, chestOffer: null, chestsSinceEpic: 0, speed: 1, auto: false, kills: 0, runs: 0, volume: 0.5, muted: false,
   };
 }
@@ -42,6 +46,7 @@ function sanitize(raw: unknown): SaveData {
   if (d.v !== 1 || !Array.isArray(d.owned) || typeof d.gold !== 'number') throw new Error('bad save');
   if (typeof d.volume !== 'number' || !(d.volume >= 0 && d.volume <= 1)) d.volume = 0.5;
   d.muted = d.muted === true;
+  if (!d.priorities || typeof d.priorities !== 'object' || Array.isArray(d.priorities)) d.priorities = {};
   return d;
 }
 

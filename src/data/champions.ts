@@ -15,6 +15,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Flèche de cristal enchantée', desc: 'Ralentissement renforcé et chance d\'étourdir.',
       apply: (s, r) => { s.slow!.pct += 0.1 * r; s.stun = { chance: 0.08 * r, dur: 1.2 }; },
     },
+    active: {
+      name: 'Flèche de cristal enchantée', desc: 'Étourdit tous les ennemis 1,6 s et les ralentit de 40 %.', cd: 75,
+      fx: { kind: 'control', slow: 0.4, slowDur: 3, stun: 1.6 },
+    },
   },
   {
     id: 'lux', name: 'Lux', title: 'La Dame de lumière', role: 'Mage', region: 'Demacia',
@@ -25,6 +29,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Étincelle finale', desc: 'Rayon plus puissant et plus long.',
       apply: (s, r) => { s.dmg *= 1 + 0.35 * r; s.range += 0.5 * r; },
     },
+    active: {
+      name: 'Étincelle finale', desc: 'Déflagration de lumière sur le plus gros groupe d\'ennemis.', cd: 60,
+      fx: { kind: 'burst', radius: 2.2, mult: 12 },
+    },
   },
   {
     id: 'annie', name: 'Annie', title: "L'Enfant des ténèbres", role: 'Mage', region: 'Noxus',
@@ -34,6 +42,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Invocation : Tibbers', desc: 'Brûle les ennemis touchés, zone agrandie.',
       apply: (s, r) => { s.burn = { mult: 0.3 * r, dur: 3 }; s.splash += 0.3 * r; },
+    },
+    active: {
+      name: 'Invocation : Tibbers', desc: 'Explosion de feu qui brûle le groupe ciblé.', cd: 55,
+      fx: { kind: 'burst', radius: 2, mult: 9, burn: { mult: 0.5, dur: 4 } },
     },
   },
 
@@ -47,6 +59,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Tir de précision', desc: 'Tirs dans la tête plus fréquents et plus forts.',
       apply: (s, r) => { s.everyN!.n = Math.max(3, 6 - r); s.everyN!.mult += 0.5 * r; },
     },
+    active: {
+      name: 'Tir de précision', desc: 'Tir massif sur l\'ennemi le plus coriace.', cd: 70,
+      fx: { kind: 'execute', mult: 18, pct: 0.08 },
+    },
   },
   {
     id: 'jinx', name: 'Jinx', title: 'La Gâchette folle', role: 'Tireur', region: 'Zaun',
@@ -56,6 +72,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Super méga roquette de la mort', desc: 'Les tirs deviennent des roquettes à zone.',
       apply: (s, r) => { s.type = 'splash'; s.splash = 0.8 + 0.2 * r; s.dmg *= 1 + 0.1 * r; },
+    },
+    active: {
+      name: 'Super méga roquette de la mort', desc: 'Roquette géante : gros dégâts de zone.', cd: 70,
+      fx: { kind: 'burst', radius: 2.5, mult: 14 },
     },
   },
   {
@@ -67,6 +87,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Piège nocif', desc: 'Les fléchettes explosent en nuage de poison.',
       apply: (s, r) => { s.type = 'splash'; s.splash = 0.9; s.burn!.mult += 0.4 * r; },
     },
+    active: {
+      name: 'Piège nocif', desc: 'Nuage toxique : ralentit fortement une zone.', cd: 45,
+      fx: { kind: 'control', radius: 2.5, slow: 0.5, slowDur: 4, mult: 5 },
+    },
   },
   {
     id: 'tf', name: 'Twisted Fate', title: 'Le Maître des cartes', role: 'Mage', region: 'Bilgewater',
@@ -76,6 +100,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Carte dorée', desc: 'Peut étourdir, plus d\'or par coup.',
       apply: (s, r) => { s.stun = { chance: 0.1 * r, dur: 1 }; s.goldHit!.chance += 0.1 * r; },
+    },
+    active: {
+      name: 'Jackpot', desc: 'Gagne de l\'or immédiatement.', cd: 60,
+      fx: { kind: 'gold', mult: 0.8 },
     },
   },
   {
@@ -87,6 +115,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Barrage de canon', desc: 'Plus d\'or et de dégâts.',
       apply: (s, r) => { s.killGold! += 0.25 * r; s.dmg *= 1 + 0.15 * r; },
     },
+    active: {
+      name: 'Barrage de canon', desc: 'Pluie de boulets sur un groupe d\'ennemis.', cd: 55,
+      fx: { kind: 'burst', radius: 2.4, mult: 11 },
+    },
   },
   {
     id: 'soraka', name: 'Soraka', title: "L'Enfant des étoiles", role: 'Support', region: 'Targon',
@@ -96,6 +128,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Souhait', desc: '+1 vie par vague par rang.',
       apply: (s, r) => { s.livesPerWave! += r; },
+    },
+    active: {
+      name: 'Souhait', desc: 'Restaure 3 vies.', cd: 80,
+      fx: { kind: 'lives', n: 3 },
     },
   },
   {
@@ -107,6 +143,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Combat ultime', desc: 'Coups d\'argent renforcés, attaque plus vite.',
       apply: (s, r) => { s.pctHp!.pct += 0.02 * r; s.rate *= 1 + 0.15 * r; },
     },
+    active: {
+      name: 'Combat ultime', desc: 'Pendant 8 s : +35 % de vitesse d\'attaque, +30 % de dégâts.', cd: 60,
+      fx: { kind: 'buff', scope: 'self', rate: 0.35, dmg: 0.3, dur: 8 },
+    },
   },
   {
     id: 'ziggs', name: 'Ziggs', title: "L'Expert en hexplosifs", role: 'Mage', region: 'Zaun',
@@ -116,6 +156,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Méga bombe infernale', desc: 'Zone et dégâts énormes.',
       apply: (s, r) => { s.splash += 0.4 * r; s.dmg *= 1 + 0.3 * r; },
+    },
+    active: {
+      name: 'Méga bombe infernale', desc: 'Bombe colossale sur un groupe d\'ennemis.', cd: 70,
+      fx: { kind: 'burst', radius: 3, mult: 16 },
     },
   },
   {
@@ -127,6 +171,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Artillerie vivante', desc: 'Portée accrue, dégâts en % des PV max.',
       apply: (s, r) => { s.range += r; s.pctHp = { every: 4, pct: 0.02 * r }; },
     },
+    active: {
+      name: 'Artillerie vivante', desc: 'Pendant 8 s : +50 % de vitesse d\'attaque, +20 % de dégâts.', cd: 55,
+      fx: { kind: 'buff', scope: 'self', rate: 0.5, dmg: 0.2, dur: 8 },
+    },
   },
   {
     id: 'yasuo', name: 'Yasuo', title: "L'Implacable", role: 'Combattant', region: 'Ionia',
@@ -136,6 +184,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Dernier souffle', desc: 'Critiques plus forts, peut projeter (étourdir).',
       apply: (s, r) => { s.crit!.mult += 0.3 * r; s.stun = { chance: 0.05 * r, dur: 1 }; },
+    },
+    active: {
+      name: 'Dernier souffle', desc: 'Projette et étourdit les ennemis d\'un groupe 1,5 s.', cd: 40,
+      fx: { kind: 'control', radius: 2, stun: 1.5, mult: 6 },
     },
   },
   {
@@ -147,6 +199,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'AMÉLIORATION !!!', desc: '+1 cible par rang, plus de dégâts.',
       apply: (s, r) => { s.targets += r; s.dmg *= 1 + 0.1 * r; },
     },
+    active: {
+      name: 'AMÉLIORATION !!!', desc: 'Alliés proches : +25 % de vitesse d\'attaque pendant 8 s.', cd: 50,
+      fx: { kind: 'buff', scope: 'near', radius: 3, rate: 0.25, dur: 8 },
+    },
   },
   {
     id: 'brand', name: 'Brand', title: 'La Vengeance flamboyante', role: 'Mage', region: 'Runeterra',
@@ -156,6 +212,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Pyrolyse', desc: 'Plus de rebonds, brûlure renforcée.',
       apply: (s, r) => { s.targets += r; s.burn!.mult += 0.15 * r; },
+    },
+    active: {
+      name: 'Pyrolyse', desc: 'Déflagration qui embrase un groupe d\'ennemis.', cd: 50,
+      fx: { kind: 'burst', radius: 2.2, mult: 10, burn: { mult: 0.6, dur: 4 } },
     },
   },
   {
@@ -167,6 +227,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: "Chaînes de l'âme", desc: 'Plus d\'immobilisations, frappe plusieurs cibles.',
       apply: (s, r) => { s.stun!.chance += 0.06 * r; s.type = 'multi'; s.targets = 1 + r; },
     },
+    active: {
+      name: 'Chaînes de l\'âme', desc: 'Immobilise 2 s et ralentit un large groupe.', cd: 60,
+      fx: { kind: 'control', radius: 3, slow: 0.3, slowDur: 3, stun: 2, mult: 4 },
+    },
   },
   {
     id: 'zed', name: 'Zed', title: 'Le Maître des ombres', role: 'Assassin', region: 'Ionia',
@@ -176,6 +240,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Marque de la mort', desc: 'Coups spéciaux plus forts, bonus contre les boss.',
       apply: (s, r) => { s.everyN!.mult += 0.5 * r; s.bossMult = 1 + 0.25 * r; },
+    },
+    active: {
+      name: 'Marque de la mort', desc: 'Marque et exécute l\'ennemi le plus coriace.', cd: 55,
+      fx: { kind: 'execute', mult: 20, pct: 0.12 },
     },
   },
 
@@ -189,6 +257,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Pluie de balles', desc: '+1 cible par rang.',
       apply: (s, r) => { s.targets += r; s.dmg *= 1 + 0.1 * r; },
     },
+    active: {
+      name: 'Pluie de balles', desc: 'Déluge de balles sur une grande zone.', cd: 45,
+      fx: { kind: 'burst', radius: 3, mult: 8 },
+    },
   },
   {
     id: 'nasus', name: 'Nasus', title: 'Le Gardien des sables', role: 'Combattant', region: 'Shurima',
@@ -198,6 +270,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Fureur des sables', desc: 'Accumule plus vite, portée accrue.',
       apply: (s, r) => { s.killStack!.amount += 0.1 * r; s.range += 0.3 * r; },
+    },
+    active: {
+      name: 'Fureur des sables', desc: 'Pendant 10 s : +50 % de dégâts, +10 % de vitesse d\'attaque.', cd: 60,
+      fx: { kind: 'buff', scope: 'self', rate: 0.1, dmg: 0.5, dur: 10 },
     },
   },
   {
@@ -209,6 +285,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Big Bang', desc: 'Dégâts contre les boss renforcés.',
       apply: (s, r) => { s.bossMult! += 0.5 * r; },
     },
+    active: {
+      name: 'Big Bang', desc: 'Exécution : dégâts énormes sur l\'ennemi le plus coriace.', cd: 80,
+      fx: { kind: 'execute', mult: 25, pct: 0.15 },
+    },
   },
   {
     id: 'anivia', name: 'Anivia', title: 'Le Cryophénix', role: 'Mage', region: 'Freljord',
@@ -218,6 +298,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Tempête glaciale', desc: 'Aura plus large, plus froide, plus forte.',
       apply: (s, r) => { s.slow!.pct += 0.1 * r; s.dmg *= 1 + 0.4 * r; s.range += 0.3 * r; },
+    },
+    active: {
+      name: 'Tempête glaciale', desc: 'Blizzard : ralentit de 60 % et blesse un groupe.', cd: 60,
+      fx: { kind: 'control', radius: 3.2, slow: 0.6, slowDur: 5, mult: 8 },
     },
   },
   {
@@ -229,6 +313,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Emprise du Néant', desc: 'Infection plus forte, +1 cible.',
       apply: (s, r) => { s.burn!.mult += 0.5 * r; s.targets += 1; },
     },
+    active: {
+      name: 'Emprise du Néant', desc: 'Infection violente d\'un groupe d\'ennemis.', cd: 50,
+      fx: { kind: 'burst', radius: 1.8, mult: 8, burn: { mult: 1, dur: 5 } },
+    },
   },
   {
     id: 'garen', name: 'Garen', title: 'La Force de Demacia', role: 'Combattant', region: 'Demacia',
@@ -238,6 +326,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Justice de Demacia', desc: 'Dégâts accrus, bonus contre les boss.',
       apply: (s, r) => { s.dmg *= 1 + 0.2 * r; s.bossMult = 1 + 0.5 * r; },
+    },
+    active: {
+      name: 'Justice de Demacia', desc: 'Toute l\'équipe : +20 % de dégâts pendant 8 s.', cd: 70,
+      fx: { kind: 'buff', scope: 'team', dmg: 0.2, dur: 8 },
     },
   },
   {
@@ -249,6 +341,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Guillotine noxienne', desc: 'Exécutions régulières aux dégâts massifs.',
       apply: (s, r) => { s.everyN = { n: Math.max(2, 5 - r), mult: 2 + r }; },
     },
+    active: {
+      name: 'Guillotine noxienne', desc: 'Exécute l\'ennemi le plus coriace.', cd: 45,
+      fx: { kind: 'execute', mult: 18, pct: 0.1 },
+    },
   },
   {
     id: 'ahri', name: 'Ahri', title: 'Le Renard à neuf queues', role: 'Mage', region: 'Ionia',
@@ -259,6 +355,10 @@ export const CHAMPIONS: ChampionDef[] = [
       name: 'Ruée spirituelle', desc: 'Plus de rebonds, attaque plus vite.',
       apply: (s, r) => { s.targets += r; s.rate *= 1 + 0.15 * r; },
     },
+    active: {
+      name: 'Ruée spirituelle', desc: 'Vague d\'esprits sur un groupe d\'ennemis.', cd: 45,
+      fx: { kind: 'burst', radius: 2.2, mult: 9 },
+    },
   },
   {
     id: 'jayce', name: 'Jayce', title: 'Le Défenseur de demain', role: 'Tireur', region: 'Piltover',
@@ -268,6 +368,10 @@ export const CHAMPIONS: ChampionDef[] = [
     ult: {
       name: 'Transformation', desc: 'Les tirs explosent en zone.',
       apply: (s, r) => { s.type = 'splash'; s.splash = 0.8 + 0.2 * r; s.dmg *= 1 + 0.15 * r; },
+    },
+    active: {
+      name: 'Transformation', desc: 'Forme Canon pendant 8 s : +20 % de vitesse, +35 % de dégâts.', cd: 55,
+      fx: { kind: 'buff', scope: 'self', rate: 0.2, dmg: 0.35, dur: 8 },
     },
   },
 ];

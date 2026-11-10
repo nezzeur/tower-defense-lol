@@ -3,14 +3,14 @@ import { store } from './save';
 
 export type Sfx =
   | 'click' | 'place' | 'upgrade' | 'shot' | 'hit' | 'death' | 'bossDeath' | 'lifeLost'
-  | 'wave' | 'victory' | 'defeat' | 'gold' | 'chestCharge' | 'chestBurst' | 'card';
+  | 'wave' | 'victory' | 'defeat' | 'gold' | 'chestCharge' | 'chestBurst' | 'card' | 'ult';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noiseBuf: AudioBuffer | null = null;
 const last: Partial<Record<Sfx, number>> = {};
 // Minimum gap (ms) between two plays of the same sound, so busy fights don't stack.
-const GAP: Partial<Record<Sfx, number>> = { shot: 60, hit: 60, death: 45, lifeLost: 120, gold: 70, click: 30, card: 80 };
+const GAP: Partial<Record<Sfx, number>> = { shot: 60, hit: 60, death: 45, lifeLost: 120, gold: 70, click: 30, card: 80, ult: 150 };
 
 function level(): number {
   const d = store.data;
@@ -134,6 +134,11 @@ const PLAY: Record<Sfx, (c: AudioContext) => void> = {
     noise(c, { d: 0.5, v: 0.22, f: 3000, to: 300, q: 0.6 });
     tone(c, { f: 160, to: 50, d: 0.4, v: 0.3 });
     [N.C5, N.G5, N.C6].forEach((f, i) => tone(c, { f, t: 0.05 + i * 0.06, d: 0.8, v: 0.1, type: 'triangle' }));
+  },
+  ult: (c) => {
+    tone(c, { f: 140, to: 620, d: 0.35, v: 0.2, type: 'sawtooth', a: 0.05 });
+    noise(c, { d: 0.45, v: 0.14, f: 500, to: 3500, q: 1.5 });
+    [N.C5, N.G5, N.C6].forEach((f, i) => tone(c, { f, t: 0.18 + i * 0.07, d: 0.5, v: 0.1, type: 'triangle' }));
   },
   card: (c) => {
     tone(c, { f: N.E5, d: 0.2, v: 0.12, type: 'triangle' });

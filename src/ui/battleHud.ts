@@ -1,14 +1,16 @@
 import { squareUrl, splashUrl } from '../art/champArt';
 import { CREATURE_HEIGHT, drawCreature } from '../art/creatures';
 import { FEATURE_INFO } from '../art/mapArt';
-import { Battle, initials, SPELLS, type SpellId, type Tower } from '../battle';
+import { Battle, initials, PRIORITIES, SPELLS, type Enemy, type SpellId, type Tower } from '../battle';
+import { SYN_TIERS, synText, teamSynergies } from '../data/synergies';
+import type { Priority } from '../types';
 import { ENEMIES } from '../data/enemies';
 import { MAP_BY_ID } from '../data/maps';
 import { REGIONS } from '../art/worldArt';
 import { champ, enemyName, fmt, level, rewardFor, stars, teamSlots } from '../game';
 import { persist, store } from '../save';
 import type { MapDef } from '../types';
-import { app, esc, itemSelect, abilityRow, levelButtons, mapThumb, portrait, starRow, statLines, ui } from './common';
+import { app, esc, itemSelect, abilityRow, levelButtons, mapThumb, portrait, starRow, statLines, ui, ultButton } from './common';
 import { go } from './index';
 
 export function startBattle(mapId: string): void {
@@ -38,6 +40,7 @@ export function startBattle(mapId: string): void {
           <span>${SPELLS[id].icon}</span><i id="cd-${id}"></i></button>`).join('')}</div>
       <div class="team-wrap">
         <div class="team-h"><span>Équipe</span><b id="b-slots"></b><span class="hint" id="b-hint"></span></div>
+        <div class="ults" id="ults"></div>
         <div class="team" id="team"></div>
       </div>
       <div class="go">
@@ -68,7 +71,9 @@ export function renderSide(): void {
   if (!b.over) ov.classList.add('hidden');
   const details = document.getElementById('details')!;
   const t = b.selectedTower;
-  details.innerHTML = t ? towerPanel(t) : mapInfoPanel(b);
+  if (t) b.selectedEnemy = null;
+  details.innerHTML = (b.selectedEnemy ? '<div class="hud-card enemy-card" id="enemy-card"></div>' : '') + (t ? towerPanel(t) : mapInfoPanel(b));
+  document.getElementById('ults')!.innerHTML = b.towers.map((x, i) => ultButton(x.def, `data-ult="${x.def.id}"`, i < 9 ? i + 1 : undefined)).join('');
   const placed = new Set(b.towers.map((x) => x.def.id));
   document.getElementById('b-slots')!.textContent = `${b.towers.length}/${teamSlots()}`;
   document.getElementById('team')!.innerHTML = store.data.owned.map((id) => {
@@ -110,6 +115,9 @@ function towerPanel(t: Tower): string {
     </div>
     ${levelButtons(def)}
     ${abilityRow(def)}
+    <button class="btn ult-big" data-ult="${def.id}" data-ult-big="${def.id}"></button>
+    <label class="item-sel">Priorité de cible
+      <select data-prio="${def.id}">${(Object.keys(PRIORITIES) as Priority[]).map((p) => `<option value="${p}" ${t.priority === p ? 'selected' : ''}>${PRIORITIES[p].name} — ${PRIORITIES[p].desc}</option>`).join('')}</select></label>
     ${tileBonusLine(t)}
     <div class="stat-grid">${statLines(t.stats).map((l) => `<div>${l}</div>`).join('')}</div>
     <div class="run-line"><span>⚔ ${t.kills} élim.</span><span>✦ ${fmt(t.dmgDone)} dégâts</span><span>${Math.round(share * 100)} %</span></div>
@@ -187,6 +195,10 @@ function wavePanel(b: Battle): string {
       <div class="next-wave">${next.length ? next.map((x) => `<div class="nw">${creatureIcon(x.id)}<span>x${x.n}</span></div>`).join('') : '<span class="small muted">—</span>'}</div>
     </div>
     <div class="hud-card">
+      <div class="hud-title">Synergies</div>
+      ${synergyList(b)}
+    </div>
+    <div class="hud-card">
       <div class="hud-title">Nexus</div>
       <div class="lives-row"><span class="heart">♥</span><b>${Math.max(0, b.lives)}</b><div class="bar green"><div style="width:${(Math.max(0, b.lives) / 30) * 100}%"></div></div></div>
     </div>
@@ -201,6 +213,46 @@ function wavePanel(b: Battle): string {
     </div>`;
 }
 
+function synergyList(b: Battle): string {
+  const list = teamSynergies(b.towers.map((t) => t.def.region));
+  if (!list.length) return '<span class="small muted">Place 2 champions de la même région pour activer une synergie.</span>';
+  return list.map((a) => {
+    const tip = `${a.region} — ${a.def.name}\n${SYN_TIERS.map((t) => `${t.n}${t.n === 4 ? '+' : ''} champions : ${synText(a.def, t.v)}`).join('\n')}`;
+    const pips = SYN_TIERS.map((_t, i) => `<i class="${i < a.tier ? 'on' : ''}"></i>`).join('');
+    return `<div class="syn ${a.tier ? 'on' : ''}" title="${esc(tip)}"><div class="syn-h"><b>${esc(a.region)}</b><span class="pips">${pips}</span><em>${a.count}</em></div>
+      <span class="small">${a.tier ? `${esc(a.def.name)} : ${esc(synText(a.def, a.value))}` : 'Encore 1 champion pour activer'}</span></div>`;
+  }).join('');
+}
+
+function enemyCard(b: Battle, e: Enemy): string {
+  const d = e.def, pct = (v: number) => `${Math.round(v * 100)} %`;
+  const shred = b.syn.armorShred ?? 0;
+  const armor = d.armor > 0 && shred ? `${pct(d.armor)} → <b>${pct(Math.max(0, d.armor - shred))}</b>` : pct(d.armor);
+  const speed = d.speed * (e.stunT > 0 ? 0 : 1 - e.slowPct);
+  const burn = e.burns.reduce((n, x) => n + x.dps, 0);
+  const status = [
+    e.slowPct > 0 ? `<span class="tagc st-slow">Ralenti −${pct(e.slowPct)} · ${e.slowT.toFixed(1)}s</span>` : '',
+    e.stunT > 0 ? `<span class="tagc st-stun">Étourdi · ${e.stunT.toFixed(1)}s</span>` : '',
+    e.burns.length ? `<span class="tagc st-burn">Brûlure ${fmt(burn)}/s${e.burns.length > 1 ? ` (x${e.burns.length})` : ''}</span>` : '',
+  ].join('') || '<span class="small muted">Aucun</span>';
+  return `<div class="hud-title">Ennemi</div>
+    <div class="mi-boss">${creatureIcon(d.id)}<div><b>${esc(d.name)}</b><span class="small muted">${d.boss ? 'Boss' : d.shape === 'boss' ? 'Monstre épique' : 'Monstre'} · fuite : −${d.leak} vie${d.leak > 1 ? 's' : ''}</span></div></div>
+    <div class="bar red"><div style="width:${Math.max(0, (e.hp / e.maxHp) * 100)}%"></div></div>
+    <div class="run-line"><span>PV</span><b>${fmt(Math.max(0, e.hp))} / ${fmt(e.maxHp)}</b></div>
+    <div class="run-line"><span>Vitesse</span><b>${speed.toFixed(2)} case/s${speed < d.speed ? ` (base ${d.speed})` : ''}</b></div>
+    <div class="run-line"><span>Armure</span><b>${armor}</b></div>
+    <div class="run-line"><span>Butin</span><b>◆ ${fmt(b.enemyReward(e))}</b></div>
+    <div class="cc-tags">${status}</div>
+    <button class="btn" data-deselect-enemy>Fermer</button>`;
+}
+
+function ultState(b: Battle, id: string): { t: Tower; i: number; p: number } | null {
+  const i = b.towers.findIndex((x) => x.def.id === id);
+  if (i < 0) return null;
+  const t = b.towers[i];
+  return { t, i, p: 1 - t.ultCd / t.def.active.cd };
+}
+
 export function refreshLive(): void {
   const gold = fmt(store.data.gold);
   const set = (id: string, v: string) => { const el = document.getElementById(id); if (el && el.textContent !== v) el.textContent = v; };
@@ -213,6 +265,33 @@ export function refreshLive(): void {
   if (!b) return;
   const wp = document.getElementById('wave-panel');
   if (wp) wp.innerHTML = wavePanel(b);
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-ult-btn]')) {
+    const st = ultState(b, btn.dataset.ultBtn!);
+    if (!st) continue;
+    const ready = b.ultReady(st.t);
+    btn.disabled = !ready;
+    btn.classList.toggle('ready', ready);
+    btn.style.setProperty('--p', `${Math.round(st.p * 360)}deg`);
+    const n = btn.querySelector('.cdn');
+    const txt = ready ? '' : String(Math.ceil(st.t.ultCd));
+    if (n && n.textContent !== txt) n.textContent = txt;
+  }
+  const big = document.querySelector<HTMLButtonElement>('[data-ult-big]');
+  if (big) {
+    const st = ultState(b, big.dataset.ultBig!);
+    if (st) {
+      const ready = b.ultReady(st.t);
+      big.disabled = !ready;
+      const key = st.i < 9 ? ` [${st.i + 1}]` : '';
+      const txt = `${st.t.def.active.name} — ${ready ? `prêt${key}` : `${Math.ceil(st.t.ultCd)} s`}`;
+      if (big.textContent !== txt) big.textContent = txt;
+      big.style.setProperty('--p', `${Math.round(st.p * 100)}%`);
+      big.classList.toggle('ready', ready);
+    }
+  }
+  const card = document.getElementById('enemy-card');
+  if (!!card !== !!b.selectedEnemy) return renderSide();
+  if (card && b.selectedEnemy) card.innerHTML = enemyCard(b, b.selectedEnemy);
   set('b-wave', String(b.wave));
   set('b-lives', String(Math.max(0, b.lives)));
   for (const id of Object.keys(SPELLS) as SpellId[]) {
