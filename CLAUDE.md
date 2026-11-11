@@ -17,7 +17,7 @@ Personal, local-only LoL-themed tower defense (PokéPath-like progression). Orig
 - `src/battle.ts` sim (setInterval) + HD render (rAF), lanes, tile features, turrets, drag-to-move
 - `src/ui/` screens: `index.ts` (router/header), `common.ts` (shared state `ui`, helpers), `atlas.ts`, `collection.ts`, `shop.ts` (+chest), `inventory.ts` (inventory + forge), `options.ts`, `starter.ts`, `battleHud.ts`, `events.ts` (all DOM listeners)
 - `src/data/` champions (26), enemies, items, `maps.ts` (regions plan + hand maps + curve), `mapgen.ts` (seeded generator)
-- `src/art/` `color.ts` (shade), `mapHD.ts` terrain/landmarks, `creatures.ts` vector monsters, `worldArt.ts` atlas, `champArt.ts`
+- `src/art/` `color.ts` (shade), `heroes.ts` (board champions: body per role + weapon + portrait head, `HERO_LOOK` weapon/shot/element per champion, `drawShot` projectiles), `mapHD.ts` terrain/landmarks, `creatures.ts` vector monsters, `worldArt.ts` atlas, `champArt.ts`
 - `scripts/sim.ts` balance bot; `public/mobs/` optional custom monster PNGs
 
 ## Game state

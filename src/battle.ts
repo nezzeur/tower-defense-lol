@@ -4,6 +4,7 @@ import { FEATURE_INFO, featureTiles, landmarkTiles, LH, LW, pathGeometry, spawnM
 import { drawMapHD } from './art/mapHD';
 import { CREATURE_HEIGHT, drawCreature } from './art/creatures';
 import { shade } from './art/color';
+import { drawHero, drawShot, hasTrail, HERO_HEAD, heroLook, impactColors } from './art/heroes';
 import { sfx } from './audio';
 import { ENEMIES } from './data/enemies';
 import { MAT_BY_ID, rollLoot } from './data/loot';
@@ -643,7 +644,7 @@ export class Battle {
     t.ultCd = u.cd;
     t.flash = 0.3;
     if (vis) {
-      this.fx.push({ kind: 'text', x: t.x, y: t.y - 34, t: 0, max: 1.1, color: '#ffd84a', text: u.name });
+      this.fx.push({ kind: 'text', x: t.x, y: t.y - 50, t: 0, max: 1.1, color: '#ffd84a', text: u.name });
       sfx('ult');
     }
     return true;
@@ -862,7 +863,7 @@ export class Battle {
 
   private shoot(t: Tower, target: Enemy, chainLeft: number): void {
     if (this.visual) sfx('shot');
-    this.projs.push({ x: t.x, y: t.y, target, tower: t, dmgMult: 1, chainLeft, hit: new Set(), trail: [] });
+    this.projs.push({ x: t.x + Math.cos(t.angle) * 14, y: t.y - 10 + Math.sin(t.angle) * 10, target, tower: t, dmgMult: 1, chainLeft, hit: new Set(), trail: [] });
   }
 
   private updateProjs(dt: number): void {
@@ -920,7 +921,11 @@ export class Battle {
     if (s.pctHp && t.hits % s.pctHp.every === 0) this.damage(e, e.maxHp * s.pctHp.pct, t, true);
     if (e.dead) return;
     e.hitFlash = 0.08;
-    if (this.visual && Math.random() < 0.5) this.burst(e.x, e.y, t.def.color, 2, 80, 2);
+    if (this.visual) {
+      const [c1, c2] = impactColors(heroLook(t.def.id, t.def.role).element, t.def.color);
+      this.burst(e.x, e.y - 8, c1, 2, 90, 2);
+      if (Math.random() < 0.5) this.burst(e.x, e.y - 8, c2, 2, 60, 2.6);
+    }
     if (s.slow && s.slow.pct >= e.slowPct) { e.slowPct = Math.min(0.8, s.slow.pct); e.slowT = s.slow.dur; }
     if (s.stun && Math.random() < s.stun.chance) e.stunT = Math.max(e.stunT, s.stun.dur * (e.def.boss ? 0.3 : 1));
     if (s.burn) {
@@ -1097,13 +1102,13 @@ export class Battle {
     ];
     units.sort((a, b) => a.y - b.y).forEach((u) => u.draw());
 
-    // Projectiles with glowing trails
+    // Projectiles: one shape per champion (arrow, bullet, orb, rocket...), soft trail for the glowing ones
     g.lineCap = 'round';
     for (const p of this.projs) {
-      const col = p.tower.def.color;
-      if (p.trail.length) {
-        g.strokeStyle = col;
-        g.globalAlpha = 0.55;
+      const col = p.tower.def.color, look = heroLook(p.tower.def.id, p.tower.def.role);
+      if (p.trail.length && hasTrail(look.shot)) {
+        g.strokeStyle = impactColors(look.element, col)[0];
+        g.globalAlpha = 0.45;
         g.lineWidth = 4;
         g.beginPath();
         g.moveTo(p.trail[0].x, p.trail[0].y);
@@ -1112,13 +1117,7 @@ export class Battle {
         g.stroke();
         g.globalAlpha = 1;
       }
-      g.shadowColor = col;
-      g.shadowBlur = 12;
-      g.fillStyle = '#ffffff';
-      g.beginPath();
-      g.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
-      g.fill();
-      g.shadowBlur = 0;
+      drawShot(g, look, col, p.x, p.y, Math.atan2(p.target.y - p.y, p.target.x - p.x), this.clock);
     }
 
     for (const f of this.fx) {
@@ -1378,11 +1377,22 @@ export class Battle {
       drawCreature(g, e.def.id, x, y, e.face, ph, this.clock, e.def.color, e.hitFlash > 0, 3);
     }
     if (e.slowPct > 0) {
-      g.strokeStyle = 'rgba(143,211,255,0.85)';
-      g.lineWidth = 2;
+      // Frost on the ground with a few ice crystals
+      g.fillStyle = 'rgba(143,211,255,0.22)';
+      g.strokeStyle = 'rgba(200,236,255,0.9)';
+      g.lineWidth = 1.6;
       g.beginPath();
-      g.ellipse(x, y, w * 0.42, Math.max(5, w * 0.12), 0, 0, Math.PI * 2);
+      g.ellipse(x, y, w * 0.46, Math.max(5, w * 0.13), 0, 0, Math.PI * 2);
+      g.fill();
       g.stroke();
+      g.fillStyle = '#e8f7ff';
+      for (let i = 0; i < 3; i++) {
+        const cx = x + (i - 1) * w * 0.3, cy = y + (i === 1 ? 3 : 0), ch = 5 + e.slowPct * 6;
+        g.beginPath();
+        g.moveTo(cx, cy - ch); g.lineTo(cx + 2.2, cy); g.lineTo(cx - 2.2, cy);
+        g.closePath();
+        g.fill();
+      }
     }
     if (e.stunT > 0) {
       g.fillStyle = '#ffd84a';
@@ -1393,7 +1403,7 @@ export class Battle {
         g.fill();
       }
     }
-    if (e.burns.length && Math.random() < 0.3) this.burst(x + (Math.random() - 0.5) * w * 0.6, y - h * 0.6, '#ff8a3d', 1, 30, 1.8);
+    if (e.burns.length && Math.random() < 0.35) this.burst(x + (Math.random() - 0.5) * w * 0.6, y - h * 0.5, Math.random() < 0.5 ? '#ffb347' : '#ff5a2a', 1, 34, 2);
     // HP bar (LoL style: dark frame, segmented fill)
     const bw = Math.max(30, Math.min(110, w * 0.95)), pct = Math.max(0, e.hp / e.maxHp), by = y - h - 10;
     g.fillStyle = '#010a13';
@@ -1404,87 +1414,40 @@ export class Battle {
     g.fillRect(x - bw / 2, by, bw * pct, 1.5);
     g.fillStyle = 'rgba(0,0,0,0.5)';
     for (let i = 1; i < 4; i++) g.fillRect(x - bw / 2 + (bw * i) / 4, by, 1, 4);
+    // Status pips above the bar: slow (blue), burn (orange), stun (yellow)
+    const pips = [e.slowPct > 0 ? '#8fd3ff' : '', e.burns.length ? '#ff8a3d' : '', e.stunT > 0 ? '#ffd84a' : ''].filter(Boolean);
+    pips.forEach((col, i) => {
+      const px = x - (pips.length - 1) * 4 + i * 8, py = by - 7;
+      g.fillStyle = '#010a13';
+      g.beginPath(); g.moveTo(px, py - 4); g.lineTo(px + 4, py); g.lineTo(px, py + 4); g.lineTo(px - 4, py); g.closePath(); g.fill();
+      g.fillStyle = col;
+      g.beginPath(); g.moveTo(px, py - 2.6); g.lineTo(px + 2.6, py); g.lineTo(px, py + 2.6); g.lineTo(px - 2.6, py); g.closePath(); g.fill();
+    });
   }
 
   private drawTower(g: CanvasRenderingContext2D, t: Tower): void {
     const lvl = level(t.def.id), rank = ultRank(lvl);
-    const idle = Math.sin(this.clock * 2.2 + t.c) * 1.2;
-    const recoil = t.flash > 0 ? (t.flash / 0.12) * 3 : 0;
-    const x = t.x - Math.cos(t.angle) * recoil, y = t.y - 4 + idle - Math.sin(t.angle) * recoil;
-    const R = 17;
+    const sel = t === this.selectedTower;
+    const fx = t.x, fy = t.y + 13; // feet, on the base plate
+    const headY = fy - HERO_HEAD;
     // Hextech base plate
     g.fillStyle = 'rgba(0,0,0,0.4)';
     g.beginPath();
-    g.ellipse(t.x, t.y + 16, 19, 6, 0, 0, Math.PI * 2);
+    g.ellipse(fx, fy + 3, 20, 6.5, 0, 0, Math.PI * 2);
     g.fill();
-    const plate = g.createLinearGradient(0, t.y + 8, 0, t.y + 18);
+    const plate = g.createLinearGradient(0, fy - 5, 0, fy + 6);
     plate.addColorStop(0, '#1e2a3a');
     plate.addColorStop(1, '#0a1428');
     g.fillStyle = plate;
     g.beginPath();
-    g.ellipse(t.x, t.y + 13, 17, 5.5, 0, 0, Math.PI * 2);
+    g.ellipse(fx, fy, 18, 6, 0, 0, Math.PI * 2);
     g.fill();
-    g.strokeStyle = t === this.selectedTower ? '#0ac8b9' : '#785a28';
-    g.lineWidth = 1.5;
+    if (sel || rank > 0) { g.shadowColor = sel ? '#0ac8b9' : rank >= 3 ? '#ffd84a' : '#c8aa6e'; g.shadowBlur = sel ? 12 : 4 + rank * 3; }
+    g.strokeStyle = sel ? '#0ac8b9' : '#c8aa6e';
+    g.lineWidth = sel ? 2 : 1.5;
     g.stroke();
-    // Gold ring frame
-    if (rank > 0) { g.shadowColor = rank >= 3 ? '#ffd84a' : '#c8aa6e'; g.shadowBlur = 6 + rank * 4; }
-    const ring = g.createLinearGradient(x, y - R - 4, x, y + R + 4);
-    ring.addColorStop(0, '#f0e6d2');
-    ring.addColorStop(0.45, '#c8aa6e');
-    ring.addColorStop(1, '#785a28');
-    g.fillStyle = '#010a13';
-    g.beginPath();
-    g.arc(x, y, R + 5, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = t === this.selectedTower ? '#0ac8b9' : ring;
-    g.beginPath();
-    g.arc(x, y, R + 3.5, 0, Math.PI * 2);
-    g.fill();
     g.shadowBlur = 0;
-    // Portrait
-    const img = squareImage(t.def.id);
-    g.save();
-    g.beginPath();
-    g.arc(x, y, R, 0, Math.PI * 2);
-    g.clip();
-    if (img) {
-      const s = R * 2.25;
-      g.drawImage(img, x - s / 2, y - s / 2, s, s);
-    } else {
-      g.fillStyle = t.def.color;
-      g.fillRect(x - R, y - R, R * 2, R * 2);
-      g.fillStyle = '#010a13';
-      g.font = 'bold 13px "Source Sans 3", system-ui, sans-serif';
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillText(initials(t.def.name), x, y + 1);
-      g.textBaseline = 'alphabetic';
-    }
-    if (t.flash > 0) {
-      g.fillStyle = `rgba(255,255,255,${(t.flash / 0.12) * 0.35})`;
-      g.fillRect(x - R, y - R, R * 2, R * 2);
-    }
-    g.restore();
-    // Aim notch on the ring
-    g.fillStyle = '#f0e6d2';
-    g.beginPath();
-    const ax = x + Math.cos(t.angle) * (R + 4), ay = y + Math.sin(t.angle) * (R + 4);
-    g.arc(ax, ay, 2.6, 0, Math.PI * 2);
-    g.fill();
-    // Level badge
-    g.fillStyle = '#010a13';
-    g.beginPath();
-    g.arc(x + 15, y + 15, 9, 0, Math.PI * 2);
-    g.fill();
-    g.strokeStyle = '#c8aa6e';
-    g.lineWidth = 1.5;
-    g.stroke();
-    g.fillStyle = '#f0e6d2';
-    g.font = '700 9px "Source Sans 3", system-ui, sans-serif';
-    g.textAlign = 'center';
-    g.fillText(String(lvl), x + 15, y + 18);
-    // Active ultimate: charge arc, pulsing ring + R badge when ready
+    // Active ultimate: charge arc on the plate, pulsing ring + R badge when ready
     const u = t.def.active;
     if (t.ultCd <= 0) {
       g.strokeStyle = '#ffd84a';
@@ -1492,34 +1455,55 @@ export class Battle {
       g.shadowBlur = 8 + Math.sin(this.clock * 6) * 4;
       g.lineWidth = 2;
       g.beginPath();
-      g.arc(x, y, R + 8, 0, Math.PI * 2);
+      g.ellipse(fx, fy, 22, 8, 0, 0, Math.PI * 2);
       g.stroke();
       g.shadowBlur = 0;
-      g.fillStyle = '#ffd84a';
-      g.beginPath();
-      g.arc(x - 15, y - 15, 7, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = '#010a13';
-      g.font = '800 9px "Source Sans 3", system-ui, sans-serif';
-      g.textAlign = 'center';
-      g.fillText('R', x - 15, y - 12);
     } else {
-      g.strokeStyle = 'rgba(10,200,185,0.8)';
+      g.strokeStyle = 'rgba(10,200,185,0.85)';
       g.lineWidth = 2;
       g.beginPath();
-      g.arc(x, y, R + 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - t.ultCd / u.cd));
+      g.ellipse(fx, fy, 22, 8, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - t.ultCd / u.cd));
       g.stroke();
     }
     if (t.buffs.length) {
-      g.strokeStyle = 'rgba(255,216,74,0.6)';
+      g.strokeStyle = 'rgba(255,216,74,0.7)';
       g.lineWidth = 3;
       g.setLineDash([4, 4]);
       g.lineDashOffset = -this.clock * 20;
       g.beginPath();
-      g.arc(x, y, R + 12, 0, Math.PI * 2);
+      g.ellipse(fx, fy, 26, 10, 0, 0, Math.PI * 2);
       g.stroke();
       g.setLineDash([]);
     }
+    // The champion: small body per role, weapon aimed at the target, official portrait as the head
+    drawHero(g, {
+      x: fx, y: fy - 1, angle: t.angle, recoil: t.flash / 0.12, clock: this.clock, seed: t.c * 1.7 + t.r,
+      img: squareImage(t.def.id), initials: initials(t.def.name), color: t.def.color, role: t.def.role,
+      look: heroLook(t.def.id, t.def.role),
+      frame: sel ? '#0ac8b9' : ['', '#c8aa6e', '#4a8fd8', '#c084fc'][t.def.rarity],
+    });
+    // Level badge
+    g.fillStyle = '#010a13';
+    g.beginPath();
+    g.arc(fx + 17, fy + 1, 8.5, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = '#c8aa6e';
+    g.lineWidth = 1.5;
+    g.stroke();
+    g.fillStyle = '#f0e6d2';
+    g.font = '700 9px "Source Sans 3", system-ui, sans-serif';
+    g.textAlign = 'center';
+    g.fillText(String(lvl), fx + 17, fy + 4);
+    if (t.ultCd <= 0) {
+      g.fillStyle = '#ffd84a';
+      g.beginPath();
+      g.arc(fx - 17, fy + 1, 7, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#010a13';
+      g.font = '800 9px "Source Sans 3", system-ui, sans-serif';
+      g.fillText('R', fx - 17, fy + 4);
+    }
+    const x = fx, y = headY, R = 12;
     // Ult rank gems
     for (let i = 0; i < rank; i++) {
       const sx = x - (rank - 1) * 7 + i * 14, sy = y - R - 9;
