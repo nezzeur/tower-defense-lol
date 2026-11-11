@@ -1,34 +1,34 @@
 import type { ItemDef, Stats } from '../types';
 
 export const ITEMS: ItemDef[] = [
-  { id: 'doran', dd: 1055, category: 'Dégâts', name: 'Lame de Doran', icon: '🗡️', desc: '+15 % dégâts', price: 150, apply: (s) => { s.dmg *= 1.15; } },
-  { id: 'coin', category: 'Utilitaire', name: 'Pièce ancienne', icon: '🪙', desc: '+50 % d\'or sur les éliminations', price: 800, apply: (s) => { s.killGold = (s.killGold ?? 0) + 0.5; } },
-  { id: 'rfc', dd: 3094, category: 'Utilitaire', name: 'Canon ultrarapide', icon: '🔭', desc: '+1 portée', price: 600, apply: (s) => { s.range += 1; } },
-  { id: 'guinsoo', dd: 3124, category: 'Vitesse', name: 'Lame enragée de Guinsoo', icon: '⚡', desc: '+35 % vitesse d\'attaque', price: 1200, apply: (s) => { s.rate *= 1.35; } },
-  { id: 'rylai', category: 'Utilitaire', name: 'Sceptre de cristal de Rylai', icon: '❄️', desc: 'Ralentit de 25 % pendant 1 s', price: 1500,
+  { id: 'doran', dd: 1055, category: 'Dégâts', name: 'Lame de Doran', icon: '🗡️', desc: '+15 % dégâts', price: 1000, apply: (s) => { s.dmg *= 1.15; } },
+  { id: 'coin', category: 'Utilitaire', name: 'Pièce ancienne', icon: '🪙', desc: '+50 % d\'or sur les éliminations', price: 15000, apply: (s) => { s.killGold = (s.killGold ?? 0) + 0.5; } },
+  { id: 'rfc', dd: 3094, category: 'Utilitaire', name: 'Canon ultrarapide', icon: '🔭', desc: '+1 portée', price: 9000, apply: (s) => { s.range += 1; } },
+  { id: 'guinsoo', dd: 3124, category: 'Vitesse', name: 'Lame enragée de Guinsoo', icon: '⚡', desc: '+35 % vitesse d\'attaque', price: 70000, apply: (s) => { s.rate *= 1.35; } },
+  { id: 'rylai', category: 'Utilitaire', name: 'Sceptre de cristal de Rylai', icon: '❄️', desc: 'Ralentit de 25 % pendant 1 s', price: 100000,
     apply: (s) => { if (!s.slow || s.slow.pct < 0.25) s.slow = { pct: 0.25, dur: 1 }; } },
-  { id: 'liandry', dd: 6653, category: 'Dégâts', name: 'Tourment de Liandry', icon: '🔥', desc: 'Brûle : 30 % des dégâts/s pendant 3 s', price: 2500,
+  { id: 'liandry', dd: 6653, category: 'Dégâts', name: 'Tourment de Liandry', icon: '🔥', desc: 'Brûle : 30 % des dégâts/s pendant 3 s', price: 280000,
     apply: (s) => { s.burn = s.burn ? { mult: s.burn.mult + 0.3, dur: s.burn.dur } : { mult: 0.3, dur: 3 }; } },
-  { id: 'ie', dd: 3031, category: 'Dégâts', name: "Lame d'infini", icon: '💎', desc: '+30 % chance de critique, critiques x2,5', price: 3000,
+  { id: 'ie', dd: 3031, category: 'Dégâts', name: "Lame d'infini", icon: '💎', desc: '+30 % chance de critique, critiques x2,5', price: 400000,
     apply: (s) => { s.crit = { chance: Math.min(1, (s.crit?.chance ?? 0) + 0.3), mult: Math.max(2.5, s.crit?.mult ?? 0) }; } },
-  { id: 'botrk', dd: 3153, category: 'Dégâts', name: 'Lame du roi déchu', icon: '⚔️', desc: 'Chaque coup : 1,5 % des PV max en dégâts bruts', price: 4000,
+  { id: 'botrk', dd: 3153, category: 'Dégâts', name: 'Lame du roi déchu', icon: '⚔️', desc: 'Chaque coup : 1,5 % des PV max en dégâts bruts', price: 1000000,
     apply: (s) => { s.pctHp = s.pctHp ? { every: s.pctHp.every, pct: s.pctHp.pct + 0.015 } : { every: 1, pct: 0.015 }; } },
-  { id: 'rabadon', dd: 3089, category: 'Dégâts', name: 'Coiffe de Rabadon', icon: '🎩', desc: '+45 % dégâts', price: 6000, apply: (s) => { s.dmg *= 1.45; } },
+  { id: 'rabadon', dd: 3089, category: 'Dégâts', name: 'Coiffe de Rabadon', icon: '🎩', desc: '+45 % dégâts', price: 3000000, apply: (s) => { s.dmg *= 1.45; } },
   // --- Starter and mid-range shop items ---
-  { id: 'longsword', dd: 1036, category: 'Dégâts', name: 'Épée longue', icon: '🗡️', desc: '+8 % dégâts', price: 80, apply: (s) => { s.dmg *= 1.08; } },
-  { id: 'dagger', dd: 1042, category: 'Vitesse', name: 'Dague', icon: '🔪', desc: "+12 % vitesse d'attaque", price: 120, apply: (s) => { s.rate *= 1.12; } },
-  { id: 'cull', dd: 1083, category: 'Utilitaire', name: 'Abatteuse', icon: '🌾', desc: "+20 % d'or sur les éliminations", price: 300, apply: (s) => { s.killGold = (s.killGold ?? 0) + 0.2; } },
-  { id: 'recurve', dd: 1043, category: 'Vitesse', name: 'Arc courbe', icon: '🏹', desc: "+20 % vitesse d'attaque", price: 400, apply: (s) => { s.rate *= 1.2; } },
-  { id: 'bfsword', dd: 1038, category: 'Dégâts', name: 'B.F. Glaive', icon: '⚔️', desc: '+25 % dégâts', price: 500, apply: (s) => { s.dmg *= 1.25; } },
-  { id: 'executioner', dd: 3123, category: 'Dégâts', name: 'Appel du bourreau', icon: '🪓', desc: '+25 % dégâts contre les boss', price: 700, apply: (s) => { s.bossMult = (s.bossMult ?? 1) + 0.25; } },
-  { id: 'zeal', dd: 3086, category: 'Vitesse', name: 'Zèle', icon: '💨', desc: "+15 % vitesse d'attaque, +10 % chance de critique (x2)", price: 900,
+  { id: 'longsword', dd: 1036, category: 'Dégâts', name: 'Épée longue', icon: '🗡️', desc: '+8 % dégâts', price: 400, apply: (s) => { s.dmg *= 1.08; } },
+  { id: 'dagger', dd: 1042, category: 'Vitesse', name: 'Dague', icon: '🔪', desc: "+12 % vitesse d'attaque", price: 600, apply: (s) => { s.rate *= 1.12; } },
+  { id: 'cull', dd: 1083, category: 'Utilitaire', name: 'Abatteuse', icon: '🌾', desc: "+20 % d'or sur les éliminations", price: 2000, apply: (s) => { s.killGold = (s.killGold ?? 0) + 0.2; } },
+  { id: 'recurve', dd: 1043, category: 'Vitesse', name: 'Arc courbe', icon: '🏹', desc: "+20 % vitesse d'attaque", price: 4000, apply: (s) => { s.rate *= 1.2; } },
+  { id: 'bfsword', dd: 1038, category: 'Dégâts', name: 'B.F. Glaive', icon: '⚔️', desc: '+25 % dégâts', price: 6000, apply: (s) => { s.dmg *= 1.25; } },
+  { id: 'executioner', dd: 3123, category: 'Dégâts', name: 'Appel du bourreau', icon: '🪓', desc: '+25 % dégâts contre les boss', price: 12000, apply: (s) => { s.bossMult = (s.bossMult ?? 1) + 0.25; } },
+  { id: 'zeal', dd: 3086, category: 'Vitesse', name: 'Zèle', icon: '💨', desc: "+15 % vitesse d'attaque, +10 % chance de critique (x2)", price: 30000,
     apply: (s) => { s.rate *= 1.15; s.crit = { chance: Math.min(1, (s.crit?.chance ?? 0) + 0.1), mult: Math.max(2, s.crit?.mult ?? 0) }; } },
-  { id: 'sheen', dd: 3057, category: 'Dégâts', name: 'Brillance', icon: '✨', desc: 'Tous les 4 coups : dégâts x2 (ou +12 % dégâts si le champion a déjà un coup spécial)', price: 1000,
+  { id: 'sheen', dd: 3057, category: 'Dégâts', name: 'Brillance', icon: '✨', desc: 'Tous les 4 coups : dégâts x2 (ou +12 % dégâts si le champion a déjà un coup spécial)', price: 45000,
     apply: (s) => { if (s.everyN) s.dmg *= 1.12; else s.everyN = { n: 4, mult: 2 }; } },
-  { id: 'mejai', dd: 3041, category: 'Dégâts', name: 'Voleur d\'âmes de Mejai', icon: '📕', desc: '+1 % de dégâts par élimination pendant la partie (ou +15 % dégâts si le champion cumule déjà)', price: 1800,
+  { id: 'mejai', dd: 3041, category: 'Dégâts', name: 'Voleur d\'âmes de Mejai', icon: '📕', desc: '+1 % de dégâts par élimination pendant la partie (ou +15 % dégâts si le champion cumule déjà)', price: 180000,
     apply: (s) => { if (s.killStack) s.dmg *= 1.15; else s.killStack = { amount: 0.01, persistent: false }; } },
-  { id: 'runaan', dd: 3085, category: 'Utilitaire', name: 'Ouragan de Runaan', icon: '🌪️', desc: '+1 cible (cible unique, multi-cibles ou rebonds), sinon +20 % dégâts', price: 2800, apply: (s) => extraTarget(s, 1.2) },
-  { id: 'ga', dd: 3026, category: 'Utilitaire', name: 'Ange gardien', icon: '👼', desc: '+1 vie à chaque vague terminée', price: 3500, apply: (s) => { s.livesPerWave = (s.livesPerWave ?? 0) + 1; } },
+  { id: 'runaan', dd: 3085, category: 'Utilitaire', name: 'Ouragan de Runaan', icon: '🌪️', desc: '+1 cible (cible unique, multi-cibles ou rebonds), sinon +20 % dégâts', price: 700000, apply: (s) => extraTarget(s, 1.2) },
+  { id: 'ga', dd: 3026, category: 'Utilitaire', name: 'Ange gardien', icon: '👼', desc: '+1 vie à chaque vague terminée', price: 1500000, apply: (s) => { s.livesPerWave = (s.livesPerWave ?? 0) + 1; } },
 
   // --- Forged items (materials dropped by monsters, see data/loot.ts) ---
   { id: 'f-rift', origin: 'rift', category: 'Dégâts', name: 'Talisman de la Faille', icon: '🧿', desc: "+20 % dégâts, +10 % vitesse d'attaque", price: 0,
@@ -68,7 +68,7 @@ function extraTarget(s: Stats, elseDmg: number): void {
   else s.dmg *= elseDmg;
 }
 
-export const SHOP_ITEMS = ITEMS.filter((i) => !i.craft);
+export const SHOP_ITEMS = ITEMS.filter((i) => !i.craft).sort((a, b) => a.price - b.price);
 export const FORGE_ITEMS = ITEMS.filter((i) => i.craft);
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
