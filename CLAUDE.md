@@ -26,7 +26,7 @@ Personal, local-only LoL-themed tower defense (PokéPath-like progression). Orig
 - Shurima, Piltover, Shadow Isles shelved (hand maps kept in `HAND`, decorative on atlas).
 - Active ultimates: `ChampionDef.active` (cd 40-80s, effect `UltFx`: burst/control/buff/execute/gold/lives), cast from HUD buttons or keys 1-9; `Battle.castUlt`; damage scaled by `TUNE.ult` (0.25, sim-tuned). `def.ult` = passive upgrade at levels 6/11/16 ("Rang d'ultime").
 - Region synergies (`src/data/synergies.ts`): 2/3/4+ same-region placed champions give +5/10/18 % (Demacia armor shred, Freljord slow, Noxus dmg, Ionia rate, Piltover range, Zaun splash, Bilgewater gold, Bandle ult recharge, Néant boss dmg).
-- Boss drops (`rewardChance`/`rollReward` in `game.ts`, save `rewardTries`): 7 maps carry a champion; each final-boss win rolls `REWARD.base 5 % * 0.82^rank` (5 % Voie du Bas ... 1.5 % Ionia), +start chance per failed win (pity, ~5-10 wins on average).
+- Boss drops (`rewardChance`/`rollReward` in `game.ts`): 7 maps carry a champion; each final-boss win rolls a fixed `REWARD.base 5 % * 0.82^rank` (5 % Voie du Bas ... 1.5 % Ionia). No pity, by user choice.
 - Target priority per champion (`Tower.priority`, save `priorities`); enemy click shows an info card (`Battle.selectedEnemy`).
 - Sim with all this at growth 1.25: ashe 11h41, lux 9h46; the bot casts ults instantly, humans will be slower. `ULT=<x>` env scales/disables ults in the sim.
 - Ideas queued: manual ult aiming, auto-cast option, more regions, enemy traits (flying, resists).

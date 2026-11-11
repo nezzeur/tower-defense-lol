@@ -322,8 +322,8 @@ function showResult(win: boolean, wave: number): void {
         sfx('chestBurst');
         reward = `<div class="reward got">${portrait(rw, 56)}<div>Le boss lâche un champion !<br><b>${esc(rw.name)}</b> — ${esc(rw.title)}</div></div>`;
       } else {
-        reward = `<div class="reward miss">${portrait(rw, 56, true)}<div>Pas de champion cette fois (${pct(had)} de chance).<br>
-          Prochaine victoire : <b>${pct(rewardChance(id))}</b></div></div>`;
+        reward = `<div class="reward miss">${portrait(rw, 56, true)}<div>Pas de champion cette fois.<br>
+          <b>${pct(had)}</b> de chance à chaque victoire contre le boss.</div></div>`;
       }
       persist();
     }

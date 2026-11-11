@@ -37,7 +37,7 @@ function mapCard(id: string, cur: string): string {
       ${open ? `${starRow(stars(m.id))}<div class="small">Record <b>${best}</b>/${m.waves} · Boss : ${esc(enemyName(m.finalBoss))}</div>`
         : `<div class="lock small">🔒 ${esc(unlockReason(m) ?? '')}</div>`}
       <div class="level-foot">
-        ${rw ? `<span class="reward-chip" title="Chance que le boss final lâche ce champion à chaque victoire. Elle augmente après chaque échec.">${portrait(rw, 22, !store.data.owned.includes(rw.id))}${store.data.owned.includes(rw.id) ? esc(rw.name) : `Butin du boss · ${pct(rewardChance(m.id))}`}</span>` : '<span></span>'}
+        ${rw ? `<span class="reward-chip" title="Chance que le boss final lâche ce champion à chaque victoire.">${portrait(rw, 22, !store.data.owned.includes(rw.id))}${store.data.owned.includes(rw.id) ? esc(rw.name) : `Butin du boss · ${pct(rewardChance(m.id))}`}</span>` : '<span></span>'}
         <button class="btn start" data-map="${id}" ${open ? '' : 'disabled'}>Jouer ▶</button>
       </div>
     </div>
