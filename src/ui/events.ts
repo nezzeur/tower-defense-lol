@@ -154,6 +154,7 @@ app.addEventListener('change', (e) => {
   const el0 = e.target as HTMLElement;
   if (el0.id === 'opt-volume') sfx('click');
   const el = e.target as HTMLInputElement | HTMLSelectElement;
+  if (el.id === 'opt-lowfx') { store.data.lowFx = (el as HTMLInputElement).checked; persist(); return; }
   if (el.id === 'b-autoult') { store.data.autoUlt = (el as HTMLInputElement).checked; persist(); el.blur(); return; }
   if (el.id === 'b-auto') {
     store.data.auto = (el as HTMLInputElement).checked;

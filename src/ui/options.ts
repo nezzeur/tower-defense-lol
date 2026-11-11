@@ -9,6 +9,10 @@ export function optionsScreen(): string {
         <input type="range" id="opt-volume" min="0" max="100" step="1" value="${Math.round(d.volume * 100)}" aria-label="Volume">
         <span id="opt-volume-val" class="small">${Math.round(d.volume * 100)} %</span></div>
     </section>
+    <section class="card"><h3>Affichage</h3>
+      <label class="auto"><input type="checkbox" id="opt-lowfx" ${d.lowFx ? 'checked' : ''}> Effets réduits</label>
+      <p class="muted small">Moins de particules, pas de lumières ni de traces au sol. À cocher si les combats saccadent.</p>
+    </section>
     <section class="card"><h3>Sauvegarde</h3>
       <p class="muted small">Sauvegarde automatique dans le navigateur. Exporte régulièrement : vider les données du navigateur efface ta progression.</p>
       <div class="row"><button class="btn" data-export>Exporter</button><button class="btn" data-copy>Copier</button></div>

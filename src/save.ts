@@ -27,6 +27,8 @@ export interface SaveData {
   auto: boolean;
   /** Cast active ultimates automatically when they are worth it. */
   autoUlt: boolean;
+  /** Reduced visual effects (fewer particles, no lights) for slower machines. */
+  lowFx: boolean;
   kills: number;
   runs: number;
   /** Master volume 0-1. */
@@ -41,7 +43,7 @@ const KEY = 'riftdefenders.save.v1' + (slot ? `:${slot}` : '');
 function fresh(): SaveData {
   return {
     v: 1, gold: 0, owned: [], levels: {}, stacks: {}, items: [], mats: {}, equip: {}, best: {}, layouts: {}, priorities: {},
-    chestsOpened: 0, chestOffer: null, chestsSinceEpic: 0, speed: 1, auto: false, autoUlt: false, kills: 0, runs: 0, volume: 0.5, muted: false,
+    chestsOpened: 0, chestOffer: null, chestsSinceEpic: 0, speed: 1, auto: false, autoUlt: false, lowFx: false, kills: 0, runs: 0, volume: 0.5, muted: false,
   };
 }
 
@@ -52,6 +54,7 @@ function sanitize(raw: unknown): SaveData {
   d.muted = d.muted === true;
   if (!d.mats || typeof d.mats !== 'object' || Array.isArray(d.mats)) d.mats = {};
   d.autoUlt = d.autoUlt === true;
+  d.lowFx = d.lowFx === true;
   if (!d.priorities || typeof d.priorities !== 'object' || Array.isArray(d.priorities)) d.priorities = {};
   return d;
 }
@@ -117,7 +120,7 @@ export function importSave(code: string): void {
 
 export function resetSave(): void {
   // Progress is wiped; device preferences (sound, game speed) are kept.
-  const { volume, muted, speed, autoUlt } = store.data;
-  store.data = { ...fresh(), volume, muted, speed, autoUlt };
+  const { volume, muted, speed, autoUlt, lowFx } = store.data;
+  store.data = { ...fresh(), volume, muted, speed, autoUlt, lowFx };
   persist();
 }

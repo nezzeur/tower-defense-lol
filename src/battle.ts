@@ -4,7 +4,9 @@ import { FEATURE_INFO, featureTiles, landmarkTiles, LH, LW, pathGeometry, spawnM
 import { drawMapHD } from './art/mapHD';
 import { CREATURE_HEIGHT, drawCreature } from './art/creatures';
 import { shade } from './art/color';
-import { drawHero, drawShot, hasTrail, HERO_HEAD, heroLook, impactColors } from './art/heroes';
+import { angDiff, drawGlow } from './art/glow';
+import { drawHero, drawShot, hasTrail, HERO_HEAD, heroLook, impactColors, lightColor, SHOT_ARC, SHOT_SPEED, type Shot } from './art/heroes';
+import { Vfx } from './art/vfx';
 import { sfx } from './audio';
 import { ENEMIES } from './data/enemies';
 import { MAT_BY_ID, rollLoot } from './data/loot';
@@ -21,6 +23,8 @@ export const TILE = 48;
 export const W = COLS * TILE;
 export const H = ROWS * TILE;
 const STEP = 1 / 60;
+/** Seconds a champion takes to drop onto its tile, and the moment its feet touch the ground. */
+const SPAWN = 0.38, LAND = SPAWN * 0.7;
 
 interface Burn { dps: number; t: number; src: Tower | null }
 
@@ -42,6 +46,11 @@ export interface Enemy {
   /** Facing (-1 left, 1 right) and walk animation phase, render only. */
   face: number;
   phase: number;
+  /** Render only: knock-back offset (px), squash (0..1) and game seconds since it spawned. */
+  kx: number;
+  ky: number;
+  sq: number;
+  born: number;
 }
 
 export interface Tower {
@@ -65,6 +74,22 @@ export interface Tower {
   /** Temporary ultimate buffs (attack speed / damage fractions). */
   buffs: { t: number; rate: number; dmg: number }[];
   priority: Priority;
+  // Render only (attack animation); nothing below feeds back into the simulation.
+  /** Smoothed aim angle and facing side. */
+  aim: number;
+  face: 1 | -1;
+  /** Attack beat: 0 rest, -1 wound back, +1 follow-through (eased toward its target every frame). */
+  sw: number;
+  /** Game seconds since the last attack, and the attack interval at that moment. */
+  since: number;
+  period: number;
+  /** Had a target at its last attack check. */
+  engaged: boolean;
+  /** Enemy the champion keeps facing between attacks. */
+  tgt: Enemy | null;
+  /** Real seconds since it was placed / since its last ultimate. */
+  born: number;
+  ultT: number;
 }
 
 /** Global knob on ultimate damage multipliers (bursts, control hits, executes), tuned with scripts/sim.ts. */
@@ -87,9 +112,10 @@ interface Proj {
   chainLeft: number;
   hit: Set<number>;
   trail: { x: number; y: number }[];
+  /** Pixels per second, and distance to the target when it was fired (for lobbed arcs). */
+  speed: number;
+  d0: number;
 }
-
-interface Particle { x: number; y: number; vx: number; vy: number; t: number; max: number; size: number; color: string }
 
 interface Fx {
   kind: 'beam' | 'ring' | 'text' | 'boom';
@@ -102,6 +128,8 @@ interface Fx {
   max: number;
   color: string;
   text?: string;
+  /** Font size of a text effect (default 15). */
+  size?: number;
 }
 
 export type SpellId = 'smite' | 'heal' | 'exhaust';
@@ -169,7 +197,14 @@ export class Battle {
   private hover: { c: number; r: number } | null = null;
 
   // Visual-only state (skipped headless)
-  private parts: Particle[] = [];
+  /** Particles, lights, ground marks and dying monsters; null in headless runs. */
+  private vfx: Vfx | null = null;
+  /** Real seconds the simulation stays frozen to give a big hit some weight. */
+  private hitStop = 0;
+  private lastStop = 0;
+  /** 0..1 darkening of the ground during an ultimate or a boss death. */
+  private dim = 0;
+  private readonly calm = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   private motes: Mote[] = [];
   private clock = 0;
   private shake = 0;
@@ -199,6 +234,13 @@ export class Battle {
     const bgc = this.bg.getContext('2d')!;
     bgc.scale(dpr, dpr);
     drawMapHD(bgc, this.map, W, H, TILE);
+    // Soft vignette baked into the terrain: frames the board and lets the lights stand out.
+    const vg = bgc.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, W * 0.75);
+    vg.addColorStop(0, 'rgba(1,10,19,0)');
+    vg.addColorStop(1, 'rgba(1,10,19,0.4)');
+    bgc.fillStyle = vg;
+    bgc.fillRect(0, 0, W, H);
+    this.vfx = new Vfx();
     this.restoreLayout();
     this.bindInput();
     this.last = this.lastFrame = performance.now();
@@ -289,6 +331,7 @@ export class Battle {
       def, c, r, x: (c + 0.5) * TILE, y: (r + 0.5) * TILE, stats: this.statsAt(def, c, r), cd: 0.3,
       hits: 0, runStacks: 0, ramp: 0, angle: 0, flash: 0, kills: 0, dmgDone: 0,
       ultCd: def.active.cd, buffs: [], priority: store.data.priorities[id] ?? 'first',
+      aim: 0, face: 1, sw: 0, since: 9, period: 1, engaged: false, tgt: null, born: 0, ultT: 9,
     };
     this.towers.push(t);
     this.refreshStats();
@@ -370,6 +413,7 @@ export class Battle {
     t.x = (c + 0.5) * TILE;
     t.y = (r + 0.5) * TILE;
     t.stats = this.statsAt(t.def, c, r);
+    t.born = 0;
     this.saveLayout();
     return true;
   }
@@ -499,11 +543,24 @@ export class Battle {
   }
 
   private burst(x: number, y: number, color: string, n: number, speed: number, size = 2.5): void {
-    if (!this.visual || this.parts.length > 600) return;
-    for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2, v = speed * (0.4 + Math.random() * 0.6);
-      this.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - speed * 0.3, t: 0, max: 0.35 + Math.random() * 0.35, size: size * (0.6 + Math.random() * 0.6), color });
-    }
+    this.vfx?.burst(x, y, color, n, speed, size);
+  }
+
+  /** Explosion: flash and shockwave, plus (when visible) debris, smoke, a mark on the ground and a light. */
+  private boom(x: number, y: number, r: number, color: string, max: number, src: Tower | null = null): void {
+    this.fx.push({ kind: 'boom', x, y, r, t: 0, max, color });
+    if (!this.vfx) return;
+    this.vfx.explosion(x, y, r, color, src ? heroLook(src.def.id, src.def.role).element : 'magic');
+    if (r >= 90) this.shake = Math.max(this.shake, Math.min(8, r / 16));
+  }
+
+  /** Freezes the simulation for a few frames (hit-stop). Never headless, at high speed or with reduced motion. */
+  private stop(sec: number): void {
+    if (!this.vfx || this.vfx.low || this.calm || store.data.speed > 2) return;
+    const now = performance.now();
+    if (now - this.lastStop < 350) return;
+    this.lastStop = now;
+    this.hitStop = Math.max(this.hitStop, sec);
   }
 
   restart(bossMode = false): void {
@@ -518,7 +575,11 @@ export class Battle {
     this.over = false;
     this.spellCd = { smite: 0, heal: 0, exhaust: 0 };
     this.selectedEnemy = null;
-    for (const t of this.towers) { t.ultCd = t.def.active.cd; t.buffs = []; t.runStacks = 0; t.ramp = 0; t.hits = 0; t.cd = 0.3; t.dmgDone = 0; t.kills = 0; }
+    for (const t of this.towers) {
+      t.ultCd = t.def.active.cd; t.buffs = []; t.runStacks = 0; t.ramp = 0; t.hits = 0; t.cd = 0.3; t.dmgDone = 0; t.kills = 0;
+      t.engaged = false; t.tgt = null; t.since = 9;
+    }
+    this.vfx?.clear();
     this.runKills = this.runGold = this.runTime = 0;
     this.runLoot = {};
     this.spawnCount = 0;
@@ -535,7 +596,8 @@ export class Battle {
       if (!alive.length) return;
       const target = alive.reduce((a, b) => (b.hp > a.hp ? b : a));
       this.damage(target, target.maxHp * 0.2, null, true);
-      this.fx.push({ kind: 'boom', x: target.x, y: target.y, r: 30, t: 0, max: 0.4, color: '#ffd84a' });
+      this.boom(target.x, target.y, 34, '#ffd84a', 0.4);
+      this.vfx?.light(target.x, target.y - 40, 60, '#ffd84a', 0.7, 0.3);
     } else if (id === 'exhaust') {
       if (!alive.length) return;
       for (const e of alive) { e.slowPct = Math.max(e.slowPct, 0.6); e.slowT = Math.max(e.slowT, 3); }
@@ -598,10 +660,10 @@ export class Battle {
         if (fx.burn) this.addBurn(e, dmg * fx.burn.mult, fx.burn.dur, t);
       }
       if (vis) {
-        this.fx.push({ kind: 'boom', x: c.x, y: c.y, r: r * 1.15, t: 0, max: 0.55, color: t.def.color });
+        this.boom(c.x, c.y, r * 1.15, t.def.color, 0.6, t);
         this.fx.push({ kind: 'ring', x: c.x, y: c.y, r: r * 1.3, t: 0, max: 0.7, color: '#ffffff' });
-        this.burst(c.x, c.y, t.def.color, 36, 220, 3.5);
-        this.shake = Math.max(this.shake, 6);
+        this.burst(c.x, c.y, t.def.color, 30, 220, 3.5);
+        this.shake = Math.max(this.shake, 7);
       }
     } else if (fx.kind === 'control') {
       const c = fx.radius ? this.densest(alive, fx.radius) : null, r = (fx.radius ?? 0) * TILE;
@@ -615,6 +677,7 @@ export class Battle {
         const cx = c?.x ?? W / 2, cy = c?.y ?? H / 2, rr = c ? r * 1.2 : W * 0.6;
         this.fx.push({ kind: 'ring', x: cx, y: cy, r: rr, t: 0, max: 0.8, color: t.def.color });
         this.fx.push({ kind: 'boom', x: cx, y: cy, r: rr * 0.8, t: 0, max: 0.5, color: t.def.color });
+        this.vfx!.light(cx, cy, rr * 1.6, t.def.color, 0.6, 0.45);
         this.shake = Math.max(this.shake, 3);
       }
     } else if (fx.kind === 'buff') {
@@ -635,17 +698,23 @@ export class Battle {
       this.damage(target, dmg * fx.mult * boss, t, false);
       this.damage(target, target.maxHp * fx.pct * (target.def.boss ? 0.5 : 1), t, true);
       if (vis) {
-        this.fx.push({ kind: 'beam', x: t.x, y: t.y, x2: target.x, y2: target.y, t: 0, max: 0.3, color: t.def.color });
-        this.fx.push({ kind: 'boom', x: target.x, y: target.y, r: 46, t: 0, max: 0.45, color: t.def.color });
-        this.burst(target.x, target.y, t.def.color, 24, 180, 3);
-        this.shake = Math.max(this.shake, 4);
+        this.fx.push({ kind: 'beam', x: t.x, y: t.y - 14, x2: target.x, y2: target.y, t: 0, max: 0.3, color: t.def.color });
+        this.boom(target.x, target.y, 50, t.def.color, 0.45, t);
+        this.burst(target.x, target.y, t.def.color, 18, 180, 3);
+        this.shake = Math.max(this.shake, 5);
       }
     }
     t.ultCd = u.cd;
     t.flash = 0.3;
+    t.ultT = 0;
     if (vis) {
-      this.fx.push({ kind: 'text', x: t.x, y: t.y - 50, t: 0, max: 1.1, color: '#ffd84a', text: u.name });
+      this.fx.push({ kind: 'text', x: t.x, y: t.y - 62, t: 0, max: 1.3, color: '#ffd84a', text: u.name, size: 17 });
       sfx('ult');
+      // The ground darkens for a moment so the ultimate's light carries
+      this.dim = 1;
+      this.vfx!.light(t.x, t.y - 20, 150, t.def.color, 0.75, 0.6);
+      this.vfx!.embers(t.x, t.y - 6, 14, t.def.color, '#ffffff', 14);
+      this.stop(0.06);
     }
     return true;
   }
@@ -684,25 +753,33 @@ export class Battle {
 
   // ---------- Loop ----------
 
-  // Simulation runs on a timer so auto-farm keeps going in a background tab (browsers pause
-  // requestAnimationFrame there but still fire throttled timers); rendering stays on rAF.
+  /** Runs the simulation up to `now`; shared by the display loop and the background timer. */
+  private advance(now: number): void {
+    const dt = Math.max(0, Math.min(1.5, (now - this.last) / 1000));
+    this.last = now;
+    if (this.paused) return;
+    if (this.hitStop > 0) { this.hitStop -= dt; return; }
+    this.acc += dt * store.data.speed;
+    let steps = 0;
+    while (this.acc >= STEP && steps < 1200) { this.step(STEP); this.acc -= STEP; steps++; }
+    if (steps >= 1200) this.acc = 0;
+  }
+
+  // The display loop drives the simulation, so movement is as smooth as the screen allows. Browsers pause
+  // requestAnimationFrame in a background tab but still fire throttled timers: the timer takes over there,
+  // which keeps auto-farm going.
   private tick = (): void => {
     const now = performance.now();
-    const dt = Math.min(1.5, (now - this.last) / 1000);
-    this.last = now;
-    if (!this.paused) {
-      this.acc += dt * store.data.speed;
-      let steps = 0;
-      while (this.acc >= STEP && steps < 1200) { this.step(STEP); this.acc -= STEP; steps++; }
-      if (steps >= 1200) this.acc = 0;
-    }
+    if (now - this.lastFrame < 150) return;
+    this.advance(now);
     if (now - this.lastFrame > 500) this.render();
   };
 
   private frame = (now: number): void => {
-    const dt = Math.min(0.1, (now - this.lastFrame) / 1000);
+    const dt = Math.max(0, Math.min(0.1, (now - this.lastFrame) / 1000));
     this.lastFrame = now;
-    if (!this.paused) this.animate(dt, dt * store.data.speed);
+    this.advance(now);
+    if (!this.paused) this.animate(dt, this.hitStop > 0 ? 0 : dt * store.data.speed);
     this.render();
     this.raf = requestAnimationFrame(this.frame);
   };
@@ -755,6 +832,7 @@ export class Battle {
     this.enemies.push({
       uid: ++this.uid, def, hp, maxHp: hp, s: 0, x: p.x, y: p.y, lane,
       slowPct: 0, slowT: 0, stunT: 0, burns: [], dead: false, hitFlash: 0, face: 1, phase: Math.random() * 6,
+      kx: 0, ky: 0, sq: 0, born: 0,
     });
   }
 
@@ -784,6 +862,8 @@ export class Battle {
         this.nexusHurt = 0.5;
         this.shake = Math.max(this.shake, e.def.boss ? 10 : 3);
         this.burst(e.x, e.y, '#ff5a5a', e.def.boss ? 30 : 8, 120);
+        this.vfx?.light(e.x, e.y, e.def.boss ? 170 : 80, '#ff4d4d', 0.7, 0.4);
+        if (e.def.boss) this.stop(0.1);
         // A boss that reaches the nexus walks the lane again instead of vanishing.
         if (e.def.boss) e.s = 0; else e.dead = true;
         if (this.lives <= 0 && !this.over) this.lose();
@@ -804,7 +884,11 @@ export class Battle {
       if (!best) { tu.cd = 0.1; continue; }
       tu.cd = 1.4;
       this.damage(best, ENEMIES.melee.hp * hpScale(this.map, this.wave) * 0.25, null, false);
-      if (this.visual) this.fx.push({ kind: 'beam', x: tu.x, y: tu.y - 40, x2: best.x, y2: best.y, t: 0, max: 0.18, color: '#7fd8ff' });
+      if (this.vfx) {
+        this.fx.push({ kind: 'beam', x: tu.x, y: tu.y - 40, x2: best.x, y2: best.y, t: 0, max: 0.18, color: '#7fd8ff' });
+        this.vfx.impact('spark', '#7fd8ff', best.x, best.y - 6, Math.atan2(best.y - tu.y + 40, best.x - tu.x), 1, best.y + 15);
+        this.vfx.light(tu.x, tu.y - 40, 34, '#7fd8ff', 0.55, 0.12);
+      }
     }
   }
 
@@ -825,11 +909,17 @@ export class Battle {
       if (!targets.length) {
         if (s.ramp) t.ramp = Math.max(0, t.ramp - dt * 0.5);
         t.cd = 0;
+        t.engaged = false;
+        t.tgt = null;
         continue;
       }
       t.cd = 1 / rate;
       t.flash = 0.12;
       const first = targets[0];
+      t.since = 0;
+      t.period = t.cd;
+      t.engaged = true;
+      t.tgt = first;
       t.angle = Math.atan2(first.y - t.y, first.x - t.x);
       if (s.ramp) t.ramp = Math.min(s.ramp.max, t.ramp + s.ramp.perHit);
 
@@ -854,7 +944,8 @@ export class Battle {
           for (const e of this.enemies) {
             if (!e.dead && distToSeg(e.x, e.y, t.x, t.y, x2, y2) < TILE * 0.45 + e.def.size) this.hit(t, e, 1);
           }
-          this.fx.push({ kind: 'beam', x: t.x, y: t.y, x2, y2, t: 0, max: 0.2, color: t.def.color });
+          this.fx.push({ kind: 'beam', x: t.x + Math.cos(t.angle) * 16, y: t.y - 10 + Math.sin(t.angle) * 12, x2, y2, t: 0, max: 0.2, color: t.def.color });
+          this.vfx?.light((t.x + x2) / 2, (t.y + y2) / 2, len * 0.6, t.def.color, 0.4, 0.2);
           break;
         }
       }
@@ -862,13 +953,21 @@ export class Battle {
   }
 
   private shoot(t: Tower, target: Enemy, chainLeft: number): void {
-    if (this.visual) sfx('shot');
-    this.projs.push({ x: t.x + Math.cos(t.angle) * 14, y: t.y - 10 + Math.sin(t.angle) * 10, target, tower: t, dmgMult: 1, chainLeft, hit: new Set(), trail: [] });
+    const look = heroLook(t.def.id, t.def.role);
+    // The shot leaves from the weapon, not from the centre of the tile
+    const x = t.x + Math.cos(t.angle) * 16, y = t.y - 10 + Math.sin(t.angle) * 12;
+    this.projs.push({
+      x, y, target, tower: t, dmgMult: 1, chainLeft, hit: new Set(), trail: [],
+      speed: SHOT_SPEED[look.shot] * TILE, d0: Math.hypot(target.x - x, target.y - y),
+    });
+    if (!this.vfx) return;
+    sfx('shot');
+    this.vfx.light(x, y, 28, lightColor(look.element, t.def.color), 0.45, 0.09);
   }
 
   private updateProjs(dt: number): void {
-    const speed = 14 * TILE;
     for (const p of this.projs) {
+      const speed = p.speed;
       const dx = p.target.x - p.x, dy = p.target.y - p.y;
       const d = Math.hypot(dx, dy);
       if (d < speed * dt + 4) {
@@ -890,7 +989,7 @@ export class Battle {
     if (s.type === 'splash') {
       const r = s.splash * TILE;
       for (const e of this.enemies) if (!e.dead && Math.hypot(e.x - p.x, e.y - p.y) <= r + e.def.size) this.hit(t, e, p.dmgMult);
-      this.fx.push({ kind: 'boom', x: p.x, y: p.y, r, t: 0, max: 0.25, color: t.def.color });
+      this.boom(p.x, p.y, r, t.def.color, 0.32, t);
       return;
     }
     if (!p.target.dead) this.hit(t, p.target, p.dmgMult);
@@ -900,7 +999,10 @@ export class Battle {
         .filter((e) => !e.dead && !p.hit.has(e.uid) && Math.hypot(e.x - p.x, e.y - p.y) < 2.5 * TILE)
         .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
       if (next) {
-        this.projs.push({ x: p.x, y: p.y, target: next, tower: t, dmgMult: p.dmgMult * 0.8, chainLeft: p.chainLeft - 1, hit: p.hit, trail: [] });
+        this.projs.push({
+          x: p.x, y: p.y, target: next, tower: t, dmgMult: p.dmgMult * 0.8, chainLeft: p.chainLeft - 1, hit: p.hit, trail: [],
+          speed: p.speed, d0: Math.hypot(next.x - p.x, next.y - p.y),
+        });
       }
     }
   }
@@ -916,16 +1018,12 @@ export class Battle {
     if (e.def.boss && s.bossMult) dmg *= s.bossMult;
     if (e.def.boss && this.syn.boss) dmg *= 1 + this.syn.boss;
     if (t.buffs.length) dmg *= 1 + t.buffs.reduce((n, b) => n + b.dmg, 0);
-    if (crit) this.fx.push({ kind: 'text', x: e.x, y: e.y - 14, t: 0, max: 0.6, color: '#ffd84a', text: fmtShort(dmg) });
+    if (crit) this.fx.push({ kind: 'text', x: e.x, y: e.y - 18, t: 0, max: 0.8, color: '#ffd84a', text: fmtShort(dmg), size: 21 });
+    if (this.vfx) this.hitFx(t, e, crit, dmg);
     this.damage(e, dmg, t, false);
     if (s.pctHp && t.hits % s.pctHp.every === 0) this.damage(e, e.maxHp * s.pctHp.pct, t, true);
     if (e.dead) return;
     e.hitFlash = 0.08;
-    if (this.visual) {
-      const [c1, c2] = impactColors(heroLook(t.def.id, t.def.role).element, t.def.color);
-      this.burst(e.x, e.y - 8, c1, 2, 90, 2);
-      if (Math.random() < 0.5) this.burst(e.x, e.y - 8, c2, 2, 60, 2.6);
-    }
     if (s.slow && s.slow.pct >= e.slowPct) { e.slowPct = Math.min(0.8, s.slow.pct); e.slowT = s.slow.dur; }
     if (s.stun && Math.random() < s.stun.chance) e.stunT = Math.max(e.stunT, s.stun.dur * (e.def.boss ? 0.3 : 1));
     if (s.burn) {
@@ -940,6 +1038,47 @@ export class Battle {
     }
   }
 
+  /** Impact visuals: particles of the attacker's element, a flash of light and a shove away from the blow. */
+  private hitFx(t: Tower, e: Enemy, crit: boolean, dmg: number): void {
+    const look = heroLook(t.def.id, t.def.role);
+    const dir = Math.atan2(e.y - t.y, e.x - t.x);
+    const aura = t.stats.type === 'aura';
+    this.vfx!.impact(look.element, t.def.color, e.x, e.y - 8, dir, crit ? 2 : aura ? 0.5 : 1, e.y + 15);
+    // Heavier monsters barely move
+    const heavy = e.def.boss ? 0.25 : e.def.shape === 'boss' ? 0.5 : 1;
+    const k = Math.min(7, 2 + (dmg / e.maxHp) * 14) * heavy * (crit ? 1.6 : 1) * (aura ? 0.4 : 1);
+    e.kx = Math.max(-11, Math.min(11, e.kx + Math.cos(dir) * k));
+    e.ky = Math.max(-7, Math.min(7, e.ky + Math.sin(dir) * k * 0.6));
+    e.sq = Math.min(1, e.sq + (crit ? 0.9 : 0.45) * heavy);
+    if (crit) {
+      this.shake = Math.max(this.shake, 2.5);
+      this.stop(0.035);
+    }
+  }
+
+  /** Death visuals: the body is knocked away and dissolves; epic monsters and bosses go out in a chain of blasts. */
+  private deathFx(e: Enemy, src: Tower | null): void {
+    const tier = e.def.boss ? 2 : e.def.shape === 'boss' ? 1 : 0;
+    sfx(tier ? 'bossDeath' : 'death');
+    const dir = src ? Math.atan2(e.y - src.y, e.x - src.x) : -Math.PI / 2;
+    this.vfx!.death({
+      id: e.def.id, img: mobImage(e.def.id), x: e.x + e.kx, y: e.y + 15 + e.ky, face: e.face, ph: e.phase, color: e.def.color,
+      h: (CREATURE_HEIGHT[e.def.id] ?? 16) * 3, tier,
+    }, dir, src ? heroLook(src.def.id, src.def.role).element : null, src?.def.color ?? e.def.color);
+    if (!tier) return;
+    this.shake = Math.max(this.shake, tier === 2 ? 12 : 6);
+    this.stop(tier === 2 ? 0.16 : 0.08);
+    this.dim = Math.max(this.dim, tier === 2 ? 1 : 0.5);
+    const n = tier === 2 ? 7 : 3;
+    for (let i = 0; i < n; i++) {
+      this.fx.push({
+        kind: 'boom', x: e.x + (Math.random() - 0.5) * 56, y: e.y - 6 - Math.random() * 54, r: 26 + Math.random() * 30,
+        t: -i * 0.11, max: 0.4, color: i % 2 ? '#ffffff' : e.def.color,
+      });
+    }
+    this.fx.push({ kind: 'ring', x: e.x, y: e.y, r: tier === 2 ? 190 : 110, t: 0, max: 0.8, color: '#ffffff' });
+  }
+
   private damage(e: Enemy, amount: number, src: Tower | null, trueDmg: boolean): void {
     if (e.dead) return;
     const dealt = trueDmg ? amount : amount * (1 - Math.max(0, e.def.armor - (this.syn.armorShred ?? 0)));
@@ -950,9 +1089,7 @@ export class Battle {
 
   private kill(e: Enemy, src: Tower | null): void {
     e.dead = true;
-    if (this.visual) sfx(e.def.boss || e.def.shape === 'boss' ? 'bossDeath' : 'death');
-    this.burst(e.x, e.y, e.def.color, e.def.shape === 'boss' ? 40 : 10, e.def.shape === 'boss' ? 200 : 110, e.def.shape === 'boss' ? 4 : 2.5);
-    this.burst(e.x, e.y, '#ffd84a', e.def.shape === 'boss' ? 16 : 3, 70, 2);
+    if (this.vfx) this.deathFx(e, src);
     const gold = Math.max(1, Math.round(e.def.gold * goldScale(this.map, this.wave) * (1 + (src?.stats.killGold ?? 0) + (this.syn.gold ?? 0))));
     store.data.gold += gold;
     store.data.kills++;
@@ -1030,20 +1167,83 @@ export class Battle {
 
   // ---------- Render (HD) ----------
 
-  /** Advances visual-only state: real dt for ambience, game dt for combat particles. */
+  /** Attack beat a champion should be showing right now: 0 at rest, -1 wound back, +1 follow-through. */
+  private swingOf(t: Tower): number {
+    const per = t.period, strike = Math.min(0.09, per * 0.18), rec = Math.min(0.3, per * 0.36), wind = Math.min(0.26, per * 0.42);
+    if (t.since < strike) { const k = t.since / strike; return -1 + 2 * (1 - (1 - k) * (1 - k)); }
+    if (t.since < strike + rec) { const k = (t.since - strike) / rec; return 1 - k * k * (3 - 2 * k); }
+    if (t.engaged && t.cd > 0 && t.cd < wind) { const k = 1 - t.cd / wind; return -(1 - (1 - k) * (1 - k)); }
+    return 0;
+  }
+
+  /** Closest living enemy within `dist` pixels of a champion (visual use only). */
+  private nearest(t: Tower, dist: number): Enemy | null {
+    let best: Enemy | null = null, bd = dist;
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      const d = Math.hypot(e.x - t.x, e.y - t.y);
+      if (d < bd) { bd = d; best = e; }
+    }
+    return best;
+  }
+
+  /** How a projectile is drawn: lobbed shots rise above the straight line and tilt along their arc. */
+  private shotPose(p: Proj, shot: Shot): { lift: number; ang: number } {
+    const dx = p.target.x - p.x, dy = p.target.y - p.y;
+    const ang = Math.atan2(dy, dx);
+    const arc = SHOT_ARC[shot];
+    if (!arc || p.d0 < 1) return { lift: 0, ang };
+    const prog = Math.min(1, Math.max(0, 1 - Math.hypot(dx, dy) / p.d0));
+    const tilt = Math.atan(Math.PI * arc * Math.cos(prog * Math.PI)) * (Math.cos(ang) >= 0 ? 1 : -1);
+    return { lift: Math.sin(prog * Math.PI) * p.d0 * arc, ang: ang - tilt };
+  }
+
+  /** Advances visual-only state: real dt for ambience and poses, game dt for anything tied to the fight. */
   private animate(dt: number, gameDt: number): void {
+    const v = this.vfx!;
+    v.low = store.data.lowFx;
     this.clock += dt;
     this.shake = Math.max(0, this.shake - dt * 30);
+    this.dim = Math.max(0, this.dim - dt * 1.5);
     this.nexusHurt = Math.max(0, this.nexusHurt - dt);
     if (this.banner) { this.banner.t += dt; if (this.banner.t > 2) this.banner = null; }
-    for (const p of this.parts) {
-      p.t += gameDt;
-      p.x += p.vx * gameDt;
-      p.y += p.vy * gameDt;
-      p.vy += 260 * gameDt;
-      p.vx *= 0.96;
+
+    // Champions: keep facing the current target, ease the attack pose, land with a puff of dust
+    for (const t of this.towers) {
+      t.since += gameDt;
+      t.ultT += dt;
+      const before = t.born;
+      t.born += dt;
+      if (before < LAND && t.born >= LAND) {
+        v.smoke(t.x, t.y + 15, 5, 6, '#b9b2a3');
+        this.fx.push({ kind: 'ring', x: t.x, y: t.y + 13, r: 26, t: 0, max: 0.3, color: '#f0e6d2' });
+      }
+      if (t.tgt?.dead) t.tgt = null;
+      // Between targets the champion watches the nearest monster coming its way, so its first blow is already aimed
+      const watch = t.tgt ?? this.nearest(t, t.stats.range * 1.7 * TILE);
+      const want = watch ? Math.atan2(watch.y - (t.y - 10), watch.x - t.x) : t.angle;
+      t.aim += angDiff(t.aim, want) * Math.min(1, dt * (t.since < 0.08 ? 40 : 14));
+      const c = Math.cos(t.aim);
+      if (Math.abs(c) > 0.18) t.face = c > 0 ? 1 : -1;
+      t.sw += (this.swingOf(t) - t.sw) * Math.min(1, dt * 45);
     }
-    this.parts = this.parts.filter((p) => p.t < p.max);
+    // Monsters recover from the last shove
+    const settle = Math.exp(-dt * 13), unsquash = Math.exp(-dt * 11);
+    for (const e of this.enemies) {
+      e.born += gameDt;
+      e.kx *= settle;
+      e.ky *= settle;
+      e.sq *= unsquash;
+    }
+    // Projectiles leave a little of their element behind
+    if (gameDt > 0) {
+      for (const p of this.projs) {
+        const look = heroLook(p.tower.def.id, p.tower.def.role);
+        v.trail(look.element, look.shot, p.tower.def.color, p.x, p.y - this.shotPose(p, look.shot).lift);
+      }
+    }
+    v.update(dt, gameDt);
+
     const style = this.map.theme.style;
     const rate = style === 'jungle' ? 0.5 : style === 'haunted' ? 0.45 : 0.3;
     if (this.motes.length < 50 && Math.random() < rate) this.motes.push(spawnMote(style));
@@ -1056,14 +1256,27 @@ export class Battle {
   }
 
   private render(): void {
-    const g = this.ctx;
+    const g = this.ctx, v = this.vfx!;
     g.save();
-    if (this.shake > 0) g.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
+    if (this.shake > 0.05 && !this.calm) {
+      // Smooth pseudo-noise rather than white noise: it reads as a jolt, not as flicker
+      const c = this.clock, amp = this.shake * 1.5;
+      g.translate(Math.sin(c * 71) * Math.cos(c * 37) * amp, Math.cos(c * 83) * Math.sin(c * 29) * amp);
+    }
     g.clearRect(-20, -20, W + 40, H + 40);
     g.drawImage(this.bg, 0, 0, W, H);
+    if (this.dim > 0.01) {
+      // The ground darkens during an ultimate or a boss death; units stay bright on top of it
+      g.fillStyle = '#01080f';
+      g.globalAlpha = 0.45 * this.dim;
+      g.fillRect(-20, -20, W + 40, H + 40);
+      g.globalAlpha = 1;
+    }
+    v.drawDecals(g);
 
     const start = this.pts[0], end = this.pts[this.pts.length - 1];
-    this.drawPortal(g, Math.min(W - 20, Math.max(20, start.x)), Math.min(H - 20, Math.max(20, start.y)));
+    const px = Math.min(W - 20, Math.max(20, start.x)), py = Math.min(H - 20, Math.max(20, start.y));
+    this.drawPortal(g, px, py);
 
     // Placement preview
     if (this.hover && (this.selectedRoster || this.dragging)) {
@@ -1095,8 +1308,10 @@ export class Battle {
     }
     if (this.selectedTower && !this.dragging) this.rangeRing(g, this.selectedTower.x, this.selectedTower.y, this.selectedTower.stats.range, 'rgba(240,230,210,0.85)');
 
+    // Everything standing on the board, back to front
     const units: { y: number; draw: () => void }[] = [
       ...this.enemies.map((e) => ({ y: e.y, draw: () => this.drawEnemy(g, e) })),
+      ...v.corpses.map((c) => ({ y: c.y - 15, draw: () => v.drawCorpse(g, c, this.clock) })),
       ...this.towers.map((t) => ({ y: t.y, draw: () => { if (t === this.dragging) g.globalAlpha = 0.35; this.drawTower(g, t); g.globalAlpha = 1; } })),
       { y: end.y, draw: () => this.drawNexus(g, end.x, end.y) },
     ];
@@ -1117,76 +1332,108 @@ export class Battle {
         g.stroke();
         g.globalAlpha = 1;
       }
-      drawShot(g, look, col, p.x, p.y, Math.atan2(p.target.y - p.y, p.target.x - p.x), this.clock);
+      const pose = this.shotPose(p, look.shot);
+      drawShot(g, look, col, p.x, p.y, pose.ang, this.clock, pose.lift);
     }
 
+    // Beams, shockwaves and blasts
     for (const f of this.fx) {
-      const k = 1 - f.t / f.max;
-      g.globalAlpha = Math.max(0, k);
+      if (f.t < 0 || f.kind === 'text') continue;
+      const k = Math.max(0, 1 - f.t / f.max);
       if (f.kind === 'beam') {
-        g.shadowColor = f.color;
-        g.shadowBlur = 20;
+        // Wide soft halo, coloured body, white-hot core
         g.strokeStyle = f.color;
-        g.lineWidth = 12 * k + 3;
-        g.beginPath();
-        g.moveTo(f.x, f.y);
-        g.lineTo(f.x2!, f.y2!);
-        g.stroke();
+        g.globalCompositeOperation = 'lighter';
+        g.globalAlpha = k * 0.3;
+        g.lineWidth = 26 * k + 8;
+        seg(g, f.x, f.y, f.x2!, f.y2!);
+        g.globalCompositeOperation = 'source-over';
+        g.globalAlpha = k * 0.95;
+        g.lineWidth = 9 * k + 3;
+        seg(g, f.x, f.y, f.x2!, f.y2!);
         g.strokeStyle = '#ffffff';
-        g.lineWidth = 3 * k + 1;
-        g.stroke();
-        g.shadowBlur = 0;
+        g.globalAlpha = k;
+        g.lineWidth = 3.5 * k + 1;
+        seg(g, f.x, f.y, f.x2!, f.y2!);
       } else if (f.kind === 'ring') {
+        const rr = f.r! * (0.55 + 0.45 * (1 - k * k));
         g.strokeStyle = f.color;
-        g.lineWidth = 3 * k + 1;
-        g.beginPath();
-        g.arc(f.x, f.y, f.r! * (0.6 + 0.4 * (1 - k)), 0, Math.PI * 2);
-        g.stroke();
-      } else if (f.kind === 'boom') {
-        const rr = f.r! * (0.4 + 0.6 * (1 - k));
-        const grad = g.createRadialGradient(f.x, f.y, 0, f.x, f.y, rr);
-        grad.addColorStop(0, 'rgba(255,255,255,0.9)');
-        grad.addColorStop(0.4, f.color);
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        g.globalAlpha = k * 0.8;
-        g.fillStyle = grad;
+        g.globalAlpha = k * 0.3;
+        g.lineWidth = 10 * k + 2;
         g.beginPath();
         g.arc(f.x, f.y, rr, 0, Math.PI * 2);
-        g.fill();
+        g.stroke();
+        g.globalAlpha = k;
+        g.lineWidth = 2.6 * k + 0.8;
+        g.stroke();
+      } else {
+        // Blast: fireball that swells fast then fades, with a shockwave racing ahead of it
+        const u = 1 - k, rr = f.r! * (0.35 + 0.65 * (1 - (1 - u) ** 3));
+        g.globalCompositeOperation = 'lighter';
+        drawGlow(g, f.x, f.y, rr * 1.3, f.color, k * 0.95);
+        drawGlow(g, f.x, f.y, rr * 0.75 * (1 - u * 0.5), '#ffffff', k * k);
+        g.globalCompositeOperation = 'source-over';
+        g.globalAlpha = k * 0.85;
+        g.strokeStyle = '#ffffff';
+        g.lineWidth = 3 * k + 0.6;
+        g.beginPath();
+        g.arc(f.x, f.y, rr * 1.08, 0, Math.PI * 2);
+        g.stroke();
       }
       g.globalAlpha = 1;
     }
 
-    for (const p of this.parts) {
-      g.globalAlpha = 1 - p.t / p.max;
-      g.fillStyle = p.color;
-      g.beginPath();
-      g.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      g.fill();
+    v.drawParticles(g);
+
+    // Light pass: everything that glows brightens the ground and whoever stands next to it
+    if (!v.low) {
+      g.globalCompositeOperation = 'screen';
+      for (const p of this.projs) {
+        const look = heroLook(p.tower.def.id, p.tower.def.role);
+        if (look.shot === 'slash') continue;
+        drawGlow(g, p.x, p.y, look.shot === 'bullet' ? 16 : 26, lightColor(look.element, p.tower.def.color), 0.5);
+      }
+      for (const e of this.enemies) {
+        if (e.burns.length) drawGlow(g, e.x, e.y - 6, 24 + Math.sin(this.clock * 23 + e.uid) * 4, '#ff8a3d', 0.32);
+      }
+      for (const t of this.towers) {
+        if (t.ultCd <= 0) drawGlow(g, t.x, t.y + 10, 32, '#ffd84a', 0.24 + Math.sin(this.clock * 6) * 0.08);
+      }
+      drawGlow(g, end.x, end.y - 12, 62 + Math.sin(this.clock * 2) * 6, this.nexusHurt > 0 ? '#ff5a5a' : this.map.theme.accent, 0.4);
+      drawGlow(g, px, py, 48 + Math.sin(this.clock * 3) * 4, '#ff5a5a', 0.32);
+      v.drawLights(g);
+      g.globalCompositeOperation = 'source-over';
     }
+
     // Ambient motes (spawned in low-res space, drawn x3)
     for (const m of this.motes) {
       if (m.blink && Math.sin(m.life * 6) < -0.2) continue;
-      g.globalAlpha = Math.min(1, m.life, (m.max - m.life)) * 0.8;
-      if (m.blink) { g.shadowColor = m.color; g.shadowBlur = 8; }
+      const a = Math.min(1, m.life, m.max - m.life) * 0.8;
+      if (m.blink && !v.low) {
+        g.globalCompositeOperation = 'lighter';
+        drawGlow(g, m.x * 3, m.y * 3, 8, m.color, a);
+        g.globalCompositeOperation = 'source-over';
+      }
+      g.globalAlpha = a;
       g.fillStyle = m.color;
       g.beginPath();
       g.arc(m.x * 3, m.y * 3, m.blink ? 2.2 : 1.6, 0, Math.PI * 2);
       g.fill();
-      g.shadowBlur = 0;
     }
     g.globalAlpha = 1;
 
-    // Damage numbers
+    // Damage numbers and labels: they pop in, then drift up and fade
     g.textAlign = 'center';
+    g.lineJoin = 'round';
     for (const f of this.fx) {
-      if (f.kind !== 'text') continue;
+      if (f.kind !== 'text' || f.t < 0) continue;
       const k = 1 - f.t / f.max;
-      g.globalAlpha = Math.max(0, k);
-      g.font = '800 15px "Source Sans 3", system-ui, sans-serif';
-      const y = f.y - (1 - k) * 22;
-      g.lineWidth = 3;
-      g.strokeStyle = 'rgba(0,0,0,0.75)';
+      const pop = f.t < 0.12 ? 1.5 - (f.t / 0.12) * 0.5 : 1;
+      g.globalAlpha = Math.max(0, Math.min(1, k * 1.6));
+      g.font = `800 ${Math.round((f.size ?? 15) * pop)}px "Source Sans 3", system-ui, sans-serif`;
+      const y = f.y - (1 - k) * 24;
+      g.lineWidth = 3.5;
+      g.strokeStyle = 'rgba(1,10,19,0.85)';
       g.strokeText(f.text!, f.x, y);
       g.fillStyle = f.color;
       g.fillText(f.text!, f.x, y);
@@ -1338,21 +1585,18 @@ export class Battle {
   private drawEnemy(g: CanvasRenderingContext2D, e: Enemy): void {
     const fly = e.def.id === 'drake' || e.def.id === 'fallenking' || e.def.id === 'spiritguard';
     const h = (CREATURE_HEIGHT[e.def.id] ?? 16) * 3, w = h * 0.9;
-    const x = e.x, y = e.y + 15;
+    // Drawn where the last blow shoved it; the simulation keeps the true position
+    const x = e.x + e.kx, y = e.y + 15 + e.ky;
     const ph = e.stunT > 0 ? 0 : e.phase;
+    // Steps out of the portal: grows and fades in over the first moments
+    const born = Math.min(1, e.born / 0.3), grow = 0.55 + 0.45 * (1 - (1 - born) * (1 - born));
     if (e.def.boss) {
-      const aura = g.createRadialGradient(x, y - h / 2, 4, x, y - h / 2, w * 0.7);
-      aura.addColorStop(0, e.def.color + '66');
-      aura.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = aura;
-      g.beginPath();
-      g.arc(x, y - h / 2, w * 0.7, 0, Math.PI * 2);
-      g.fill();
+      g.globalCompositeOperation = 'screen';
+      drawGlow(g, x, y - h / 2, w * 0.8, e.def.color, 0.45 + Math.sin(this.clock * 3) * 0.08);
+      g.globalCompositeOperation = 'source-over';
     }
-    g.fillStyle = `rgba(0,0,0,${fly ? 0.2 : 0.35})`;
-    g.beginPath();
-    g.ellipse(x, y, w * 0.38, Math.max(4, w * 0.1), 0, 0, Math.PI * 2);
-    g.fill();
+    // Soft shadow, lighter and smaller under flyers
+    drawGlow(g, x + 2, y + 1, w * (fly ? 0.36 : 0.46) * grow, '#000000', (fly ? 0.32 : 0.55) * born, Math.max(4, w * 0.13) * grow);
     if (e === this.selectedEnemy) {
       const pulse = 1 + Math.sin(this.clock * 5) * 0.06;
       g.strokeStyle = '#ffd84a';
@@ -1364,18 +1608,21 @@ export class Battle {
       g.stroke();
       g.shadowBlur = 0;
     }
+    // The body squashes when hit and springs back
     const custom = mobImage(e.def.id);
+    g.save();
+    g.translate(x, y);
+    g.scale((1 + e.sq * 0.14) * grow, (1 - e.sq * 0.16) * grow);
+    if (born < 1) g.globalAlpha *= born;
     if (custom) {
       const ih = h, iw = (custom.naturalWidth / custom.naturalHeight) * ih;
-      g.save();
       if (e.hitFlash > 0) g.filter = 'brightness(2.2)';
-      g.translate(x, y);
       if (e.face < 0) g.scale(-1, 1);
       g.drawImage(custom, -iw / 2, -ih, iw, ih);
-      g.restore();
     } else {
-      drawCreature(g, e.def.id, x, y, e.face, ph, this.clock, e.def.color, e.hitFlash > 0, 3);
+      drawCreature(g, e.def.id, 0, 0, e.face, ph, this.clock, e.def.color, e.hitFlash > 0, 3);
     }
+    g.restore();
     if (e.slowPct > 0) {
       // Frost on the ground with a few ice crystals
       g.fillStyle = 'rgba(143,211,255,0.22)';
@@ -1430,11 +1677,8 @@ export class Battle {
     const sel = t === this.selectedTower;
     const fx = t.x, fy = t.y + 13; // feet, on the base plate
     const headY = fy - HERO_HEAD;
-    // Hextech base plate
-    g.fillStyle = 'rgba(0,0,0,0.4)';
-    g.beginPath();
-    g.ellipse(fx, fy + 3, 20, 6.5, 0, 0, Math.PI * 2);
-    g.fill();
+    // Hextech base plate on a soft shadow
+    drawGlow(g, fx + 2, fy + 3, 27, '#000000', 0.6, 9.5);
     const plate = g.createLinearGradient(0, fy - 5, 0, fy + 6);
     plate.addColorStop(0, '#1e2a3a');
     plate.addColorStop(1, '#0a1428');
@@ -1476,8 +1720,14 @@ export class Battle {
       g.setLineDash([]);
     }
     // The champion: small body per role, weapon aimed at the target, official portrait as the head
+    const per = t.period, strike = Math.min(0.09, per * 0.18), wind = Math.min(0.26, per * 0.42);
     drawHero(g, {
-      x: fx, y: fy - 1, angle: t.angle, recoil: t.flash / 0.12, clock: this.clock, seed: t.c * 1.7 + t.r,
+      x: fx, y: fy - 1, aim: t.aim, face: t.face, swing: t.sw,
+      charge: t.engaged && t.cd > 0 && t.cd < wind ? 1 - t.cd / wind : 0,
+      flash: Math.max(0, 1 - t.since / (strike + 0.07)),
+      ult: t.ultT < 0.7 ? t.ultT / 0.7 : 0,
+      spawn: Math.min(1, t.born / SPAWN),
+      clock: this.clock, seed: t.c * 1.7 + t.r,
       img: squareImage(t.def.id), initials: initials(t.def.name), color: t.def.color, role: t.def.role,
       look: heroLook(t.def.id, t.def.role),
       frame: sel ? '#0ac8b9' : ['', '#c8aa6e', '#4a8fd8', '#c084fc'][t.def.rarity],
@@ -1522,6 +1772,13 @@ export class Battle {
 }
 
 const LOOT_COLOR = ['', '#a09b8c', '#4a8fd8', '#c084fc', '#ffb347'];
+
+function seg(g: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number): void {
+  g.beginPath();
+  g.moveTo(x1, y1);
+  g.lineTo(x2, y2);
+  g.stroke();
+}
 
 function distToSeg(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax, dy = by - ay;

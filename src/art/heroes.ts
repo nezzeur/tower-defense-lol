@@ -1,13 +1,15 @@
 // Original vector champions for the battle board: a small body per role, a weapon per champion,
-// and the official portrait (loaded at runtime) as the head. Also draws each champion's projectile.
+// and the official portrait (loaded at runtime) as the head. Attacks are animated in three beats
+// (wind-up, strike, recovery). Also draws each champion's projectile.
 import type { Role } from '../types';
 import { shade } from './color';
+import { angDiff, drawGlow } from './glow';
 
 type G = CanvasRenderingContext2D;
 
 export type Weapon =
-  | 'bow' | 'crossbow' | 'gun' | 'rifle' | 'twin' | 'rocket' | 'blowgun' | 'cards' | 'staff' | 'orb' | 'bomb'
-  | 'sword' | 'axe' | 'blades' | 'hammer' | 'none';
+  | 'bow' | 'crossbow' | 'gun' | 'rifle' | 'twin' | 'rocket' | 'cannon' | 'blowgun' | 'cards' | 'staff' | 'orb' | 'bomb'
+  | 'sword' | 'axe' | 'blades' | 'none';
 export type Shot = 'arrow' | 'bolt' | 'orb' | 'bullet' | 'rocket' | 'bomb' | 'dart' | 'shuriken' | 'card' | 'slash' | 'star';
 export type Element = 'ice' | 'fire' | 'poison' | 'spark' | 'magic' | 'shadow';
 
@@ -29,7 +31,7 @@ export const HERO_LOOK: Record<string, HeroLook> = {
   ziggs: L('bomb', 'bomb', 'fire'),
   kogmaw: L('none', 'orb', 'poison'),
   yasuo: L('sword', 'slash', 'magic'),
-  heimer: L('hammer', 'bolt', 'spark'),
+  heimer: L('cannon', 'bolt', 'spark'),
   brand: L('orb', 'orb', 'fire'),
   morgana: L('orb', 'orb', 'shadow'),
   zed: L('blades', 'shuriken', 'shadow'),
@@ -41,7 +43,7 @@ export const HERO_LOOK: Record<string, HeroLook> = {
   garen: L('sword', 'slash', 'spark'),
   darius: L('axe', 'slash', 'fire'),
   ahri: L('orb', 'orb', 'magic'),
-  jayce: L('hammer', 'bolt', 'spark'),
+  jayce: L('cannon', 'bolt', 'spark'),
 };
 
 const DEFAULT_LOOK: Record<Role, HeroLook> = {
@@ -54,59 +56,95 @@ const DEFAULT_LOOK: Record<Role, HeroLook> = {
 
 export const heroLook = (id: string, role: Role): HeroLook => HERO_LOOK[id] ?? DEFAULT_LOOK[role];
 
-/** Two particle colours for an impact of this element (magic uses the champion's own colour). */
+/** Projectile speed in tiles per second. */
+export const SHOT_SPEED: Record<Shot, number> = {
+  arrow: 17, bolt: 20, orb: 12.5, bullet: 26, rocket: 11.5, bomb: 10.5, dart: 18, shuriken: 17, card: 15, slash: 34, star: 13,
+};
+/** Height of a lobbed shot's arc, as a fraction of its flight distance. */
+export const SHOT_ARC: Partial<Record<Shot, number>> = { bomb: 0.3, arrow: 0.05, star: 0.1, card: 0.04 };
+
+const IMPACT: Record<Exclude<Element, 'magic'>, [string, string]> = {
+  ice: ['#e8f7ff', '#8fd3ff'],
+  fire: ['#ffb347', '#ff5a2a'],
+  poison: ['#c6f56a', '#5aa02c'],
+  spark: ['#fff3b0', '#ffd84a'],
+  shadow: ['#b07cd8', '#3a1f52'],
+};
+const LIGHT: Record<Exclude<Element, 'magic'>, string> = { ice: '#8fd3ff', fire: '#ff8a3d', poison: '#a6e84a', spark: '#ffd070', shadow: '#b07cd8' };
+/** Colour of the light an attack of this element casts on its surroundings. */
+export const lightColor = (el: Element, color: string): string => (el === 'magic' ? color : LIGHT[el]);
+const magicPairs = new Map<string, [string, string]>();
+
+/** Two colours for the particles and light of this element (magic uses the champion's own colour). */
 export function impactColors(el: Element, color: string): [string, string] {
-  switch (el) {
-    case 'ice': return ['#e8f7ff', '#8fd3ff'];
-    case 'fire': return ['#ffb347', '#ff5a2a'];
-    case 'poison': return ['#c6f56a', '#5aa02c'];
-    case 'spark': return ['#fff3b0', '#ffd84a'];
-    case 'shadow': return ['#b07cd8', '#3a1f52'];
-    default: return [color, '#ffffff'];
-  }
+  if (el !== 'magic') return IMPACT[el];
+  let pair = magicPairs.get(color);
+  if (!pair) magicPairs.set(color, pair = [color, '#ffffff']);
+  return pair;
 }
 
 const GOLD = '#c8aa6e', GOLD_DARK = '#785a28', STEEL = '#cfd6e0', STEEL_DARK = '#6c7686', WOOD = '#7a5230', INK = '#010a13';
+const MELEE = new Set<Weapon>(['sword', 'axe', 'blades']);
+const GUNLIKE = new Set<Weapon>(['gun', 'rifle', 'twin', 'rocket', 'cannon', 'crossbow', 'blowgun']);
 
 function rr(g: G, x: number, y: number, w: number, h: number, r: number): void {
   g.beginPath();
   g.roundRect(x, y, w, h, r);
 }
 
-function glowOrb(g: G, x: number, y: number, r: number, color: string): void {
-  const grad = g.createRadialGradient(x, y, 0, x, y, r * 2.2);
-  grad.addColorStop(0, '#ffffff');
-  grad.addColorStop(0.3, color);
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = grad;
-  g.beginPath();
-  g.arc(x, y, r * 2.2, 0, Math.PI * 2);
-  g.fill();
+/** Additive glow (light). Leaves the blend mode back on the default. */
+function glow(g: G, x: number, y: number, r: number, color: string, a = 1): void {
+  g.globalCompositeOperation = 'lighter';
+  drawGlow(g, x, y, r, color, a);
+  g.globalCompositeOperation = 'source-over';
+}
+
+/** What the weapon is doing right now. */
+interface WeaponPose {
+  /** 0..1 wound back (bow string drawn, arm cocked). */
+  back: number;
+  /** 0..1 follow-through after the strike. */
+  fwd: number;
+  /** 0..1 building up before the attack. */
+  charge: number;
+  /** 1 at the instant of the attack, fading to 0. */
+  flash: number;
 }
 
 /** Weapon drawn along +x from the hand (origin). */
-function drawWeapon(g: G, w: Weapon, color: string, clock: number, drawn: boolean): void {
-  g.lineCap = 'round';
+function drawWeapon(g: G, w: Weapon, color: string, clock: number, a: WeaponPose): void {
   switch (w) {
     case 'bow': {
+      const bend = 1 + a.back * 0.12, cx = 1 - a.back * 1.5;
       g.strokeStyle = WOOD; g.lineWidth = 2.6;
-      g.beginPath(); g.arc(1, 0, 11, -1.15, 1.15); g.stroke();
-      g.strokeStyle = color; g.lineWidth = 1.2;
-      g.beginPath(); g.arc(1, 0, 11, -1.15, -0.75); g.stroke();
-      g.beginPath(); g.arc(1, 0, 11, 0.75, 1.15); g.stroke();
-      const sx = 1 + Math.cos(1.15) * 11, sy = Math.sin(1.15) * 11, pull = drawn ? -3 : 3;
+      g.beginPath(); g.arc(cx, 0, 11, -1.15 * bend, 1.15 * bend); g.stroke();
+      g.strokeStyle = color; g.lineWidth = 1.3;
+      g.beginPath(); g.arc(cx, 0, 11, -1.15 * bend, -0.75 * bend); g.stroke();
+      g.beginPath(); g.arc(cx, 0, 11, 0.75 * bend, 1.15 * bend); g.stroke();
+      const tx = cx + Math.cos(1.15 * bend) * 11, ty = Math.sin(1.15 * bend) * 11;
+      const mid = tx - 1 - a.back * 7 + a.flash * 2; // string: pulled back, then snaps past its rest
       g.strokeStyle = '#e8eef5'; g.lineWidth = 0.9;
-      g.beginPath(); g.moveTo(sx, -sy); g.lineTo(sx + pull - 3, 0); g.lineTo(sx, sy); g.stroke();
-      if (drawn) { g.strokeStyle = color; g.lineWidth = 1.6; g.beginPath(); g.moveTo(sx - 6, 0); g.lineTo(15, 0); g.stroke(); }
+      g.beginPath(); g.moveTo(tx, -ty); g.lineTo(mid, 0); g.lineTo(tx, ty); g.stroke();
+      if (a.back > 0.12) {
+        // Nocked arrow, its tip glowing as the shot charges
+        g.strokeStyle = color; g.lineWidth = 1.6;
+        g.beginPath(); g.moveTo(mid, 0); g.lineTo(mid + 17, 0); g.stroke();
+        g.fillStyle = '#ffffff';
+        g.beginPath(); g.moveTo(mid + 20.5, 0); g.lineTo(mid + 15.5, -2.4); g.lineTo(mid + 15.5, 2.4); g.closePath(); g.fill();
+        glow(g, mid + 19, 0, 4 + a.charge * 5, color, 0.35 + a.charge * 0.5);
+      }
       break;
     }
-    case 'crossbow':
+    case 'crossbow': {
       g.fillStyle = WOOD; rr(g, -2, -1.6, 15, 3.2, 1); g.fill();
       g.strokeStyle = STEEL; g.lineWidth = 2.2;
-      g.beginPath(); g.moveTo(10, -7); g.quadraticCurveTo(14, 0, 10, 7); g.stroke();
+      g.beginPath(); g.moveTo(10, -7); g.quadraticCurveTo(14 - a.back * 2, 0, 10, 7); g.stroke();
+      const mid = 5 - a.back * 3 + a.flash * 4;
       g.strokeStyle = '#e8eef5'; g.lineWidth = 0.8;
-      g.beginPath(); g.moveTo(10, -7); g.lineTo(5, 0); g.lineTo(10, 7); g.stroke();
+      g.beginPath(); g.moveTo(10, -7); g.lineTo(mid, 0); g.lineTo(10, 7); g.stroke();
+      if (a.flash < 0.3) { g.strokeStyle = color; g.lineWidth = 1.5; g.beginPath(); g.moveTo(mid, 0); g.lineTo(15, 0); g.stroke(); }
       break;
+    }
     case 'gun':
       g.fillStyle = STEEL_DARK; rr(g, 0, -2, 12, 4, 1); g.fill();
       g.fillStyle = WOOD; rr(g, -1, 0, 4, 6, 1); g.fill();
@@ -126,10 +164,19 @@ function drawWeapon(g: G, w: Weapon, color: string, clock: number, drawn: boolea
       break;
     case 'rocket':
       g.fillStyle = color; rr(g, -5, -4.5, 20, 9, 3); g.fill();
+      g.strokeStyle = INK; g.lineWidth = 0.8; g.stroke();
       g.fillStyle = INK; g.beginPath(); g.arc(15, 0, 3.4, 0, Math.PI * 2); g.fill();
       g.fillStyle = '#ffffff';
       for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(8 + i * 2.4, -4.5); g.lineTo(9.2 + i * 2.4, -2); g.lineTo(10.4 + i * 2.4, -4.5); g.fill(); }
       g.fillStyle = STEEL_DARK; g.fillRect(-2, 4, 3, 4);
+      break;
+    case 'cannon':
+      // Hextech blaster: steel barrel, glowing cell that brightens as it charges
+      g.fillStyle = STEEL_DARK; rr(g, -4, -3.4, 12, 6.8, 2); g.fill();
+      g.fillStyle = STEEL; rr(g, 6, -2.4, 12, 4.8, 1.2); g.fill();
+      g.fillStyle = GOLD; g.fillRect(4.5, -3.8, 2.4, 7.6);
+      g.fillStyle = color; rr(g, -2, -1.6, 5, 3.2, 1); g.fill();
+      glow(g, 0.5, 0, 4 + a.charge * 5, color, 0.4 + a.charge * 0.5);
       break;
     case 'blowgun':
       g.strokeStyle = WOOD; g.lineWidth = 2.4;
@@ -139,27 +186,34 @@ function drawWeapon(g: G, w: Weapon, color: string, clock: number, drawn: boolea
       break;
     case 'cards':
       for (let i = -1; i <= 1; i++) {
-        g.save(); g.translate(7, 0); g.rotate(i * 0.42);
+        g.save(); g.translate(7, 0); g.rotate(i * (0.42 + a.charge * 0.3));
         g.fillStyle = i === 0 ? color : '#f0e6d2'; rr(g, 0, -3, 9, 6, 1); g.fill();
         g.strokeStyle = GOLD_DARK; g.lineWidth = 0.8; g.stroke();
         g.restore();
       }
+      if (a.charge > 0) glow(g, 12, 0, 5 + a.charge * 5, color, a.charge * 0.7);
       break;
     case 'staff':
       g.strokeStyle = WOOD; g.lineWidth = 2.4;
       g.beginPath(); g.moveTo(-8, 0); g.lineTo(13, 0); g.stroke();
       g.strokeStyle = GOLD; g.lineWidth = 1.6;
       g.beginPath(); g.arc(15, 0, 4.2, 0.9, Math.PI * 2 - 0.9); g.stroke();
-      glowOrb(g, 15, 0, 2.6 + Math.sin(clock * 4) * 0.4, color);
+      g.fillStyle = '#ffffff'; g.beginPath(); g.arc(15, 0, 1.8 + a.charge * 1.2, 0, Math.PI * 2); g.fill();
+      glow(g, 15, 0, 7 + Math.sin(clock * 4) * 1 + a.charge * 8 + a.flash * 9, color, 0.75);
       break;
-    case 'orb':
-      glowOrb(g, 11, Math.sin(clock * 3) * 1.5, 4 + Math.sin(clock * 5) * 0.5, color);
+    case 'orb': {
+      const r = Math.max(1.2, 4 + Math.sin(clock * 5) * 0.5 + a.charge * 2.6 - a.fwd * 3);
+      const oy = Math.sin(clock * 3) * 1.5;
+      g.fillStyle = '#ffffff'; g.beginPath(); g.arc(11, oy, r * 0.45, 0, Math.PI * 2); g.fill();
+      glow(g, 11, oy, r * 2.4 + a.flash * 6, color, 0.9);
       break;
+    }
     case 'bomb':
+      if (a.fwd > 0.45) break; // already thrown
       g.fillStyle = '#1b1f27'; g.beginPath(); g.arc(9, 0, 5, 0, Math.PI * 2); g.fill();
       g.strokeStyle = STEEL_DARK; g.lineWidth = 1; g.stroke();
       g.strokeStyle = WOOD; g.lineWidth = 1.2; g.beginPath(); g.moveTo(12.5, -3.5); g.lineTo(15, -6); g.stroke();
-      glowOrb(g, 15.5, -6.5, 1.2 + Math.random() * 0.6, '#ffb347');
+      glow(g, 15.5, -6.5, 3 + Math.random() * 1.5 + a.charge * 3, '#ffb347', 0.9);
       break;
     case 'sword':
       g.fillStyle = STEEL; g.beginPath(); g.moveTo(3, -2.4); g.lineTo(19, -1.6); g.lineTo(23, 0); g.lineTo(19, 1.6); g.lineTo(3, 2.4); g.closePath(); g.fill();
@@ -179,12 +233,6 @@ function drawWeapon(g: G, w: Weapon, color: string, clock: number, drawn: boolea
         g.fillStyle = color; g.fillRect(-1, o - 1.6, 2.4, 3.2);
       }
       break;
-    case 'hammer':
-      g.strokeStyle = STEEL_DARK; g.lineWidth = 2.6;
-      g.beginPath(); g.moveTo(-5, 0); g.lineTo(13, 0); g.stroke();
-      g.fillStyle = STEEL; rr(g, 11, -6, 9, 12, 2); g.fill();
-      g.fillStyle = color; rr(g, 13, -3.5, 5, 7, 1); g.fill();
-      break;
     case 'none':
       break;
   }
@@ -192,18 +240,43 @@ function drawWeapon(g: G, w: Weapon, color: string, clock: number, drawn: boolea
 
 /** Distance from the hand to the muzzle / tip, for the firing flash. */
 const TIP: Record<Weapon, number> = {
-  bow: 14, crossbow: 14, gun: 13, rifle: 21, twin: 12, rocket: 17, blowgun: 16, cards: 16, staff: 16, orb: 12, bomb: 10,
-  sword: 22, axe: 20, blades: 16, hammer: 20, none: 8,
+  bow: 14, crossbow: 15, gun: 13, rifle: 21, twin: 12, rocket: 17, cannon: 19, blowgun: 16, cards: 16, staff: 16, orb: 12, bomb: 10,
+  sword: 22, axe: 20, blades: 16, none: 8,
 };
+
+/** Star-shaped burst at the muzzle, k: 1 at the shot, fading to 0. */
+function muzzle(g: G, x: number, k: number, color: string): void {
+  g.globalCompositeOperation = 'lighter';
+  drawGlow(g, x + 2, 0, 5 + 9 * k, color, k);
+  const prev = g.globalAlpha;
+  g.globalAlpha = prev * k;
+  g.fillStyle = '#ffffff';
+  g.beginPath();
+  g.moveTo(x, -1.5); g.lineTo(x + 4, -5 * k - 1.5); g.lineTo(x + 3.2, -1.2); g.lineTo(x + 11 * k + 4, 0);
+  g.lineTo(x + 3.2, 1.2); g.lineTo(x + 4, 5 * k + 1.5); g.lineTo(x, 1.5);
+  g.closePath();
+  g.fill();
+  g.globalAlpha = prev;
+  g.globalCompositeOperation = 'source-over';
+}
 
 export interface HeroPose {
   /** Feet position (centre). */
   x: number;
   y: number;
-  /** Aim angle (radians). */
-  angle: number;
-  /** 0..1 right after an attack. */
-  recoil: number;
+  /** Smoothed aim angle (radians) and facing side. */
+  aim: number;
+  face: 1 | -1;
+  /** Attack beat: 0 at rest, -1 fully wound back, +1 end of the follow-through. */
+  swing: number;
+  /** 0..1 while the attack builds up (glows grow). */
+  charge: number;
+  /** 1 at the instant of the attack, fading to 0 (muzzle flash, blade trail). */
+  flash: number;
+  /** 0 when idle, else 0..1 progress of the ultimate pose. */
+  ult: number;
+  /** 0..1 progress of the drop onto the board (1 = settled). */
+  spawn: number;
   clock: number;
   /** Phase offset so champions do not breathe in sync. */
   seed: number;
@@ -220,21 +293,40 @@ export interface HeroPose {
 export const HERO_HEAD = 33;
 
 export function drawHero(g: G, p: HeroPose): void {
-  const face = Math.cos(p.angle) >= 0 ? 1 : -1;
+  const { face, look } = p, w = look.weapon;
+  const s = p.swing, back = Math.max(0, -s), fwd = Math.max(0, s);
+  const ultK = p.ult > 0 && p.ult < 1 ? Math.sin(Math.PI * p.ult) : 0;
   const bob = Math.sin(p.clock * 2.2 + p.seed) * 0.9;
   const dark = shade(p.color, -0.45), mid = shade(p.color, -0.2), light = shade(p.color, 0.25);
   const robe = p.role === 'Mage' || p.role === 'Support';
   const wide = p.role === 'Combattant';
   const hw = wide ? 9.5 : robe ? 7.5 : 7;
-  const top = -23 + bob, waist = -10;
+  const waist = -10, top = -23 + bob;
+
+  // Drop onto the board, then a short squash on landing
+  const sp = p.spawn;
+  const drop = sp < 0.7 ? -((1 - sp / 0.7) ** 2) * 44 : 0;
+  const squash = sp >= 0.7 && sp < 1 ? Math.sin(((sp - 0.7) / 0.3) * Math.PI) * 0.16 : 0;
 
   g.save();
-  g.translate(p.x, p.y);
+  g.translate(p.x, p.y + drop - ultK * 7);
+  if (sp < 0.5) g.globalAlpha *= sp / 0.5;
+  if (squash) g.scale(1 + squash * 0.7, 1 - squash);
+  const A = g.globalAlpha;
   g.lineJoin = 'round';
+  g.lineCap = 'round';
 
-  // Cape / scarf behind the body
+  // Ultimate: a column of light rises behind the champion
+  if (ultK > 0) {
+    g.globalCompositeOperation = 'lighter';
+    drawGlow(g, 0, -24, 30, p.color, ultK * 0.95, 62);
+    drawGlow(g, 0, -1, 32, '#ffffff', ultK * 0.55, 9);
+    g.globalCompositeOperation = 'source-over';
+  }
+
+  // Cape / scarf behind the body, pulled by the swing
   if (wide || p.role === 'Assassin') {
-    const sway = Math.sin(p.clock * 2.6 + p.seed) * 2;
+    const sway = Math.sin(p.clock * 2.6 + p.seed) * 2 + s * 3.5;
     g.fillStyle = wide ? dark : '#1b1f27';
     g.beginPath();
     g.moveTo(-face * 4, top + 2);
@@ -244,7 +336,7 @@ export function drawHero(g: G, p: HeroPose): void {
     g.fill();
   }
 
-  // Legs or robe
+  // Legs or robe (planted: only the upper body moves with the attack)
   if (robe) {
     g.fillStyle = dark;
     g.beginPath();
@@ -252,17 +344,24 @@ export function drawHero(g: G, p: HeroPose): void {
     g.closePath(); g.fill();
     g.fillStyle = GOLD_DARK; g.fillRect(-hw - 2.5, -2, hw * 2 + 5, 2);
   } else {
+    const step = wide ? 1.5 + fwd * 1.5 : fwd; // front foot slides forward on the strike
     g.fillStyle = '#232a36';
-    rr(g, -5.5, waist - 1, 4.5, 9, 1.5); g.fill();
-    rr(g, 1, waist - 1, 4.5, 9, 1.5); g.fill();
+    rr(g, -5.5 - (face < 0 ? step : 0), waist - 1, 4.5, 9, 1.5); g.fill();
+    rr(g, 1 + (face > 0 ? step : 0), waist - 1, 4.5, 9, 1.5); g.fill();
     g.fillStyle = dark;
-    rr(g, -6.5, -3.5, 6, 3.5, 1.2); g.fill();
-    rr(g, 0.5, -3.5, 6, 3.5, 1.2); g.fill();
+    rr(g, -6.5 - (face < 0 ? step : 0), -3.5, 6, 3.5, 1.2); g.fill();
+    rr(g, 0.5 + (face > 0 ? step : 0), -3.5, 6, 3.5, 1.2); g.fill();
   }
 
-  // Back arm
-  g.strokeStyle = mid; g.lineWidth = 3.6; g.lineCap = 'round';
-  g.beginPath(); g.moveTo(-face * (hw - 1.5), top + 4); g.lineTo(-face * (hw + 1), top + 11); g.stroke();
+  // Upper body: leans back on the wind-up, into the blow on the strike
+  g.save();
+  g.translate(0, waist);
+  g.rotate(face * s * 0.13 * (1 - ultK));
+  g.translate(Math.cos(p.aim) * fwd * 2.2, -waist);
+
+  // Back arm counterbalances the weapon arm
+  g.strokeStyle = mid; g.lineWidth = 3.6;
+  g.beginPath(); g.moveTo(-face * (hw - 1.5), top + 4); g.lineTo(-face * (hw + 1 + back * 2), top + 11 - ultK * 12); g.stroke();
 
   // Torso
   const body = g.createLinearGradient(0, top, 0, waist);
@@ -280,8 +379,8 @@ export function drawHero(g: G, p: HeroPose): void {
   g.fillStyle = GOLD_DARK; g.fillRect(-hw + 1.5, waist - 2.2, hw * 2 - 3, 2.2);
   g.fillStyle = GOLD; g.fillRect(-1.5, waist - 2.6, 3, 3);
   if (wide) {
-    for (const s of [-1, 1]) {
-      g.fillStyle = STEEL; g.beginPath(); g.ellipse(s * hw, top + 3, 4.6, 3.6, 0, 0, Math.PI * 2); g.fill();
+    for (const sd of [-1, 1]) {
+      g.fillStyle = STEEL; g.beginPath(); g.ellipse(sd * hw, top + 3, 4.6, 3.6, 0, 0, Math.PI * 2); g.fill();
       g.strokeStyle = GOLD_DARK; g.lineWidth = 0.9; g.stroke();
     }
   }
@@ -290,102 +389,170 @@ export function drawHero(g: G, p: HeroPose): void {
     g.beginPath(); g.ellipse(0, -HERO_HEAD - 13 + bob, 7, 2.2, 0, 0, Math.PI * 2); g.stroke();
   }
 
-  // Head: official portrait in a framed medallion
-  const hy = -HERO_HEAD + bob, R = 11;
-  g.fillStyle = INK; g.beginPath(); g.arc(0, hy, R + 2.6, 0, Math.PI * 2); g.fill();
-  g.fillStyle = p.frame; g.beginPath(); g.arc(0, hy, R + 1.5, 0, Math.PI * 2); g.fill();
+  // Head: official portrait in a framed medallion. Champions without a weapon lunge with it.
+  const hx0 = w === 'none' ? Math.cos(p.aim) * (fwd * 4 - back * 2) : 0;
+  const hy = -HERO_HEAD + bob + (w === 'none' ? Math.sin(p.aim) * (fwd * 3 - back * 1.5) : 0), R = 11;
+  g.fillStyle = INK; g.beginPath(); g.arc(hx0, hy, R + 2.6, 0, Math.PI * 2); g.fill();
+  g.fillStyle = p.frame; g.beginPath(); g.arc(hx0, hy, R + 1.5, 0, Math.PI * 2); g.fill();
   g.save();
-  g.beginPath(); g.arc(0, hy, R, 0, Math.PI * 2); g.clip();
+  g.beginPath(); g.arc(hx0, hy, R, 0, Math.PI * 2); g.clip();
   if (p.img) {
-    const s = R * 2.3;
-    g.drawImage(p.img, -s / 2, hy - s / 2, s, s);
+    const sz = R * 2.3;
+    g.drawImage(p.img, hx0 - sz / 2, hy - sz / 2, sz, sz);
   } else {
-    g.fillStyle = p.color; g.fillRect(-R, hy - R, R * 2, R * 2);
+    g.fillStyle = p.color; g.fillRect(hx0 - R, hy - R, R * 2, R * 2);
     g.fillStyle = INK; g.font = 'bold 10px "Source Sans 3", system-ui, sans-serif';
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(p.initials, 0, hy + 0.5);
+    g.fillText(p.initials, hx0, hy + 0.5);
     g.textBaseline = 'alphabetic';
   }
-  if (p.recoil > 0) { g.fillStyle = `rgba(255,255,255,${Math.min(1, p.recoil) * 0.3})`; g.fillRect(-R, hy - R, R * 2, R * 2); }
+  if (p.flash > 0 || ultK > 0) {
+    g.fillStyle = '#ffffff';
+    g.globalAlpha = A * Math.min(0.6, p.flash * 0.25 + ultK * 0.5);
+    g.fillRect(hx0 - R, hy - R, R * 2, R * 2);
+    g.globalAlpha = A;
+  }
   g.restore();
+  if (w === 'none' && (p.charge > 0 || p.flash > 0)) {
+    glow(g, hx0 + Math.cos(p.aim) * 12, hy + Math.sin(p.aim) * 10, 5 + p.charge * 7 + p.flash * 6, p.color, 0.5 + p.charge * 0.4);
+  }
 
-  // Weapon arm, aimed at the target
+  // Weapon arm: where it points depends on the kind of weapon and on the beat of the attack
   const sx = face * (hw - 2), sy = top + 5;
-  const kick = Math.min(1, p.recoil) * 3.5;
-  const hx = sx + Math.cos(p.angle) * (7 - kick), hyy = sy + Math.sin(p.angle) * (7 - kick) * 0.8;
-  g.strokeStyle = mid; g.lineWidth = 3.6; g.lineCap = 'round';
+  let wa = p.aim, reach = 7;
+  if (MELEE.has(w)) { wa = p.aim + face * s * 1.25; reach = 7 + fwd * 2.5; }
+  else if (w === 'bow') { wa = p.aim - face * 0.06 * back; reach = 8 + fwd * 1.5; }
+  else if (GUNLIKE.has(w)) { wa = p.aim - face * (0.05 * back + 0.2 * fwd); reach = 7 - fwd * 3.5; }
+  else if (w === 'staff') { wa = p.aim - face * 0.75 * back + face * 0.12 * fwd; reach = 7 + fwd * 3; }
+  else if (w === 'orb') reach = 6 - 2 * back + 4 * fwd;
+  else if (w === 'cards') { wa = p.aim + face * s * 0.7; reach = 7 + fwd * 2; }
+  else if (w === 'bomb') { wa = p.aim + face * s * 1.1; reach = 7 + fwd * 2; }
+  else reach = 5;
+  if (ultK > 0) wa += angDiff(wa, -Math.PI / 2 + face * 0.3) * ultK; // weapon raised to the sky
+  const hx = sx + Math.cos(wa) * reach, hyy = sy + Math.sin(wa) * reach * 0.85;
+
+  // Blade trail: a bright crescent sweeping through the arc of the swing
+  if (MELEE.has(w) && p.flash > 0) {
+    const u = 1 - p.flash, span = 2.5;
+    const a0 = p.aim - face * 1.25;
+    const lead = a0 + face * span * Math.min(1, u * 2.4), tail = a0 + face * span * Math.max(0, Math.min(1, u * 2.4 - 0.55));
+    const Rs = reach + (w === 'blades' ? 16 : 22);
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = A * p.flash * 0.55;
+    g.fillStyle = p.color;
+    g.beginPath();
+    g.arc(sx, sy, Rs, tail, lead, face < 0);
+    g.arc(sx, sy, Rs * 0.8, lead, tail, face > 0);
+    g.closePath();
+    g.fill();
+    g.globalAlpha = A * p.flash;
+    g.strokeStyle = '#ffffff'; g.lineWidth = 1.8;
+    g.beginPath(); g.arc(sx, sy, Rs, tail, lead, face < 0); g.stroke();
+    g.globalAlpha = A;
+    g.globalCompositeOperation = 'source-over';
+  }
+
+  g.strokeStyle = mid; g.lineWidth = 3.6;
   g.beginPath(); g.moveTo(sx, sy); g.lineTo(hx, hyy); g.stroke();
   g.save();
   g.translate(hx, hyy);
-  g.rotate(p.angle);
+  g.rotate(wa);
   if (face < 0) g.scale(1, -1);
-  drawWeapon(g, p.look.weapon, p.color, p.clock, p.recoil <= 0);
-  if (p.recoil > 0.35 && p.look.weapon !== 'none') {
-    const [c1] = impactColors(p.look.element, p.color);
-    g.globalAlpha = Math.min(1, p.recoil);
-    glowOrb(g, TIP[p.look.weapon], 0, 3.2, c1);
-    g.globalAlpha = 1;
+  drawWeapon(g, w, p.color, p.clock, { back, fwd, charge: p.charge, flash: p.flash });
+  if (p.flash > 0.05 && (GUNLIKE.has(w) || w === 'bow')) {
+    muzzle(g, TIP[w], w === 'bow' || w === 'blowgun' || w === 'crossbow' ? p.flash * 0.5 : p.flash, IMPACT_OR(look.element, p.color));
   }
   g.restore();
   g.fillStyle = '#f2c9a0'; g.beginPath(); g.arc(hx, hyy, 2, 0, Math.PI * 2); g.fill();
 
+  g.restore(); // upper body
+
+  // Ultimate: ring of light spreading from the feet
+  if (p.ult > 0 && p.ult < 1) {
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = A * (1 - p.ult);
+    g.strokeStyle = p.color; g.lineWidth = 3;
+    g.beginPath(); g.ellipse(0, 0, 10 + p.ult * 34, (10 + p.ult * 34) * 0.38, 0, 0, Math.PI * 2); g.stroke();
+    g.globalAlpha = A;
+    g.globalCompositeOperation = 'source-over';
+  }
   g.restore();
 }
 
-/** Draws one projectile at (x, y) heading along `ang`. */
-export function drawShot(g: G, look: HeroLook, color: string, x: number, y: number, ang: number, clock: number): void {
+const IMPACT_OR = (el: Element, color: string): string => impactColors(el, color)[0];
+
+/**
+ * Draws one projectile heading along `ang`. (x, y) is its point on the ground line to the target;
+ * `lift` raises it above that line (lobbed shots) while its shadow stays on the ground.
+ */
+export function drawShot(g: G, look: HeroLook, color: string, x: number, y: number, ang: number, clock: number, lift = 0): void {
   const [c1, c2] = impactColors(look.element, color);
+  // Shadow on the ground gives the shot some height
+  g.fillStyle = 'rgba(0,0,0,0.22)';
+  g.beginPath();
+  g.ellipse(x, y + 13, 5, 2, 0, 0, Math.PI * 2);
+  g.fill();
   g.save();
-  g.translate(x, y);
+  g.translate(x, y - lift);
   g.lineCap = 'round';
   switch (look.shot) {
     case 'arrow':
       g.rotate(ang);
-      g.shadowColor = c2; g.shadowBlur = 8;
+      glow(g, 2, 0, 9, c2, 0.8);
+      g.strokeStyle = c2; g.lineWidth = 3; g.globalAlpha *= 0.35;
+      g.beginPath(); g.moveTo(-26, 0); g.lineTo(-11, 0); g.stroke();   // motion streak
+      g.globalAlpha /= 0.35;
       g.strokeStyle = c1; g.lineWidth = 2;
       g.beginPath(); g.moveTo(-11, 0); g.lineTo(4, 0); g.stroke();
-      g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(8, 0); g.lineTo(2, -3.2); g.lineTo(2, 3.2); g.closePath(); g.fill();
+      g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(8.5, 0); g.lineTo(2, -3.2); g.lineTo(2, 3.2); g.closePath(); g.fill();
       g.strokeStyle = c2; g.lineWidth = 1.4;
       g.beginPath(); g.moveTo(-11, 0); g.lineTo(-14, -3); g.moveTo(-11, 0); g.lineTo(-14, 3); g.stroke();
       break;
     case 'bolt':
       g.rotate(ang);
-      g.shadowColor = color; g.shadowBlur = 10;
+      glow(g, 0, 0, 12, color, 0.9);
       g.strokeStyle = color; g.lineWidth = 4;
-      g.beginPath(); g.moveTo(-8, 0); g.lineTo(5, 0); g.stroke();
-      g.strokeStyle = '#ffffff'; g.lineWidth = 1.6;
-      g.beginPath(); g.moveTo(-6, 0); g.lineTo(6, 0); g.stroke();
+      g.beginPath(); g.moveTo(-9, 0); g.lineTo(5, 0); g.stroke();
+      g.strokeStyle = '#ffffff'; g.lineWidth = 1.7;
+      g.beginPath(); g.moveTo(-6, 0); g.lineTo(6.5, 0); g.stroke();
       break;
     case 'bullet':
       g.rotate(ang);
-      g.shadowColor = c2; g.shadowBlur = 6;
-      g.strokeStyle = c2; g.lineWidth = 2.6;
+      glow(g, 0, 0, 8, c2, 0.8);
+      g.strokeStyle = c2; g.lineWidth = 2.4; g.globalAlpha *= 0.4;
+      g.beginPath(); g.moveTo(-30, 0); g.lineTo(-10, 0); g.stroke();   // tracer
+      g.globalAlpha /= 0.4;
+      g.lineWidth = 2.6;
       g.beginPath(); g.moveTo(-12, 0); g.lineTo(2, 0); g.stroke();
       g.strokeStyle = '#ffffff'; g.lineWidth = 1.4;
-      g.beginPath(); g.moveTo(-3, 0); g.lineTo(4, 0); g.stroke();
+      g.beginPath(); g.moveTo(-3, 0); g.lineTo(4.5, 0); g.stroke();
       break;
     case 'rocket':
       g.rotate(ang);
-      glowOrb(g, -9, 0, 3 + Math.random() * 1.5, '#ffb347');
+      glow(g, -10, 0, 8 + Math.random() * 4, '#ffb347', 1);
+      g.fillStyle = '#fff3b0'; g.beginPath(); g.moveTo(-7, -2); g.lineTo(-13 - Math.random() * 5, 0); g.lineTo(-7, 2); g.closePath(); g.fill();
       g.fillStyle = color; rr(g, -7, -3, 12, 6, 2.5); g.fill();
+      g.strokeStyle = INK; g.lineWidth = 0.7; g.stroke();
       g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(9, 0); g.lineTo(4.5, -3); g.lineTo(4.5, 3); g.closePath(); g.fill();
       g.fillStyle = INK; g.fillRect(-7, -4.5, 3, 1.5); g.fillRect(-7, 3, 3, 1.5);
       break;
     case 'bomb':
+      g.rotate(clock * 9);
       g.fillStyle = '#1b1f27'; g.beginPath(); g.arc(0, 0, 5, 0, Math.PI * 2); g.fill();
       g.strokeStyle = STEEL_DARK; g.lineWidth = 1; g.stroke();
-      glowOrb(g, Math.cos(clock * 18) * 5, Math.sin(clock * 18) * 5, 1.6, '#ffb347');
+      g.fillStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.arc(-1.6, -1.8, 1.4, 0, Math.PI * 2); g.fill();
+      glow(g, 5.5, -3, 4 + Math.random() * 2, '#ffb347', 1);
       break;
     case 'dart':
       g.rotate(ang);
-      g.shadowColor = c2; g.shadowBlur = 6;
+      glow(g, 2, 0, 7, c2, 0.7);
       g.strokeStyle = c1; g.lineWidth = 1.8;
       g.beginPath(); g.moveTo(-8, 0); g.lineTo(6, 0); g.stroke();
       g.fillStyle = '#e84057'; g.beginPath(); g.moveTo(-8, 0); g.lineTo(-12, -3); g.lineTo(-12, 3); g.closePath(); g.fill();
       break;
     case 'shuriken':
+      glow(g, 0, 0, 11, color, 0.7);
       g.rotate(clock * 22);
-      g.shadowColor = color; g.shadowBlur = 8;
       g.fillStyle = STEEL;
       g.beginPath();
       for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4, r = i % 2 ? 2.4 : 7.5; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
@@ -393,22 +560,30 @@ export function drawShot(g: G, look: HeroLook, color: string, x: number, y: numb
       g.fillStyle = color; g.beginPath(); g.arc(0, 0, 1.6, 0, Math.PI * 2); g.fill();
       break;
     case 'card':
+      glow(g, 0, 0, 10, color, 0.7);
       g.rotate(clock * 16);
-      g.shadowColor = color; g.shadowBlur = 8;
       g.fillStyle = color; rr(g, -3.5, -5, 7, 10, 1.2); g.fill();
       g.strokeStyle = '#f0e6d2'; g.lineWidth = 1; g.stroke();
       break;
     case 'slash':
+      // Blade wave: a bright crescent with a fading wake
       g.rotate(ang);
-      g.shadowColor = color; g.shadowBlur = 10;
-      g.strokeStyle = color; g.lineWidth = 4;
-      g.beginPath(); g.arc(-8, 0, 12, -0.85, 0.85); g.stroke();
-      g.strokeStyle = '#ffffff'; g.lineWidth = 1.6;
-      g.beginPath(); g.arc(-8, 0, 12, -0.6, 0.6); g.stroke();
+      g.globalCompositeOperation = 'lighter';
+      g.strokeStyle = color; g.lineWidth = 3; g.globalAlpha *= 0.3;
+      g.beginPath(); g.arc(-26, 0, 12, -0.7, 0.7); g.stroke();
+      g.globalAlpha /= 0.3;
+      g.lineWidth = 4.5; g.globalAlpha *= 0.6;
+      g.beginPath(); g.arc(-17, 0, 12, -0.8, 0.8); g.stroke();
+      g.globalAlpha /= 0.6;
+      g.lineWidth = 5;
+      g.beginPath(); g.arc(-8, 0, 12, -0.9, 0.9); g.stroke();
+      g.strokeStyle = '#ffffff'; g.lineWidth = 2;
+      g.beginPath(); g.arc(-8, 0, 12, -0.7, 0.7); g.stroke();
+      g.globalCompositeOperation = 'source-over';
       break;
     case 'star':
+      glow(g, 0, 0, 13, color, 0.9);
       g.rotate(clock * 6);
-      g.shadowColor = color; g.shadowBlur = 10;
       g.fillStyle = '#ffffff';
       g.beginPath();
       for (let i = 0; i < 10; i++) { const a = (i * Math.PI) / 5 - Math.PI / 2, r = i % 2 ? 2.6 : 6.5; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
@@ -416,10 +591,12 @@ export function drawShot(g: G, look: HeroLook, color: string, x: number, y: numb
       g.strokeStyle = color; g.lineWidth = 1.2; g.stroke();
       break;
     default: {
-      // orb: glowing sphere, darker core for shadow magic
-      glowOrb(g, 0, 0, 4.2, look.element === 'magic' ? color : c1);
-      if (look.element === 'shadow') { g.fillStyle = '#1a0f24'; g.beginPath(); g.arc(0, 0, 2.4, 0, Math.PI * 2); g.fill(); }
-      g.strokeStyle = c2; g.globalAlpha = 0.7; g.lineWidth = 1;
+      // Orb: glowing sphere with an orbiting ring; a dark heart for shadow magic
+      const base = look.element === 'magic' ? color : c1;
+      glow(g, 0, 0, 13 + Math.sin(clock * 20) * 1.5, look.element === 'shadow' ? c1 : base, 0.95);
+      g.fillStyle = look.element === 'shadow' ? '#1a0f24' : '#ffffff';
+      g.beginPath(); g.arc(0, 0, look.element === 'shadow' ? 3 : 2.4, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = look.element === 'shadow' ? c1 : c2; g.lineWidth = 1; g.globalAlpha *= 0.75;
       g.beginPath(); g.ellipse(0, 0, 6.5, 2.6, clock * 6, 0, Math.PI * 2); g.stroke();
       break;
     }
@@ -427,5 +604,5 @@ export function drawShot(g: G, look: HeroLook, color: string, x: number, y: numb
   g.restore();
 }
 
-/** Shots that keep the soft coloured trail behind them. */
-export const hasTrail = (s: Shot): boolean => s === 'orb' || s === 'rocket' || s === 'bolt' || s === 'star' || s === 'bomb';
+/** Shots that keep a soft coloured trail behind them (the ones flying along the ground line). */
+export const hasTrail = (s: Shot): boolean => s === 'orb' || s === 'rocket' || s === 'bolt';

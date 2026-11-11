@@ -14,10 +14,10 @@ Personal, local-only LoL-themed tower defense (PokéPath-like progression). Orig
 
 ## Layout
 - `src/game.ts` rules: stats, levels (max 150), stars, unlocks (`unlockReason`, `isArena`), economy `BALANCE`, waves, chests
-- `src/battle.ts` sim (setInterval) + HD render (rAF), lanes, tile features, turrets, drag-to-move
+- `src/battle.ts` sim + HD render, lanes, tile features, turrets, drag-to-move. The rAF loop drives the sim (`advance`) for smooth motion; the 50 ms timer only takes over in a hidden tab. Render-only fields on `Tower`/`Enemy` (aim, swing, knock-back...) never feed the sim. Hit-stop, light pass (`screen` blend) and `store.data.lowFx` (reduced effects option)
 - `src/ui/` screens: `index.ts` (router/header), `common.ts` (shared state `ui`, helpers), `atlas.ts`, `collection.ts`, `shop.ts` (+chest), `inventory.ts` (inventory + forge), `options.ts`, `starter.ts`, `battleHud.ts`, `events.ts` (all DOM listeners)
 - `src/data/` champions (26), enemies, items, `maps.ts` (regions plan + hand maps + curve), `mapgen.ts` (seeded generator)
-- `src/art/` `color.ts` (shade), `heroes.ts` (board champions: body per role + weapon + portrait head, `HERO_LOOK` weapon/shot/element per champion, `drawShot` projectiles), `mapHD.ts` terrain/landmarks, `creatures.ts` vector monsters, `worldArt.ts` atlas, `champArt.ts`
+- `src/art/` `color.ts` (shade), `glow.ts` (cached soft sprites for every glow/light/soft shadow — use it instead of `shadowBlur`), `vfx.ts` (`Vfx`: particles with physics, lights, ground marks, dying monsters; visual only, null in headless), `heroes.ts` (board champions: body per role + weapon + portrait head, `HERO_LOOK` weapon/shot/element per champion, `drawShot` projectiles), `mapHD.ts` terrain/landmarks, `creatures.ts` vector monsters, `worldArt.ts` atlas, `champArt.ts`
 - `scripts/sim.ts` balance bot; `public/mobs/` optional custom monster PNGs
 
 ## Game state
