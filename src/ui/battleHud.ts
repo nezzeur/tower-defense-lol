@@ -72,7 +72,7 @@ export function renderSide(): void {
   const details = document.getElementById('details')!;
   const t = b.selectedTower;
   if (t) b.selectedEnemy = null;
-  details.innerHTML = (b.selectedEnemy ? '<div class="hud-card enemy-card" id="enemy-card"></div>' : '') + (t ? towerPanel(t) : mapInfoPanel(b));
+  details.innerHTML = (b.selectedEnemy ? '<div class="hud-card enemy-card"><div id="enemy-card"></div><button class="btn" data-deselect-enemy>Fermer</button></div>' : '') + (t ? towerPanel(t) : mapInfoPanel(b));
   document.getElementById('ults')!.innerHTML = b.towers.map((x, i) => ultButton(x.def, `data-ult="${x.def.id}"`, i < 9 ? i + 1 : undefined)).join('');
   const placed = new Set(b.towers.map((x) => x.def.id));
   document.getElementById('b-slots')!.textContent = `${b.towers.length}/${teamSlots()}`;
@@ -242,8 +242,7 @@ function enemyCard(b: Battle, e: Enemy): string {
     <div class="run-line"><span>Vitesse</span><b>${speed.toFixed(2)} case/s${speed < d.speed ? ` (base ${d.speed})` : ''}</b></div>
     <div class="run-line"><span>Armure</span><b>${armor}</b></div>
     <div class="run-line"><span>Butin</span><b>◆ ${fmt(b.enemyReward(e))}</b></div>
-    <div class="cc-tags">${status}</div>
-    <button class="btn" data-deselect-enemy>Fermer</button>`;
+    <div class="cc-tags">${status}</div>`;
 }
 
 function ultState(b: Battle, id: string): { t: Tower; i: number; p: number } | null {
@@ -252,6 +251,8 @@ function ultState(b: Battle, id: string): { t: Tower; i: number; p: number } | n
   const t = b.towers[i];
   return { t, i, p: 1 - t.ultCd / t.def.active.cd };
 }
+
+const liveHtml = new WeakMap<HTMLElement, string>();
 
 export function refreshLive(): void {
   const gold = fmt(store.data.gold);
@@ -264,7 +265,9 @@ export function refreshLive(): void {
   const b = ui.battle;
   if (!b) return;
   const wp = document.getElementById('wave-panel');
-  if (wp) wp.innerHTML = wavePanel(b);
+  // Only touch the DOM when something changed, so hover tooltips and images don't flicker.
+  const setHtml = (el: HTMLElement, html: string) => { if (liveHtml.get(el) !== html) { liveHtml.set(el, html); el.innerHTML = html; } };
+  if (wp) setHtml(wp, wavePanel(b));
   for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-ult-btn]')) {
     const st = ultState(b, btn.dataset.ultBtn!);
     if (!st) continue;
@@ -291,7 +294,7 @@ export function refreshLive(): void {
   }
   const card = document.getElementById('enemy-card');
   if (!!card !== !!b.selectedEnemy) return renderSide();
-  if (card && b.selectedEnemy) card.innerHTML = enemyCard(b, b.selectedEnemy);
+  if (card && b.selectedEnemy) setHtml(card, enemyCard(b, b.selectedEnemy));
   set('b-wave', String(b.wave));
   set('b-lives', String(Math.max(0, b.lives)));
   for (const id of Object.keys(SPELLS) as SpellId[]) {

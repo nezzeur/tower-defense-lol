@@ -166,6 +166,7 @@ app.addEventListener('change', (e) => {
   if (el.dataset.prio && ui.battle) {
     const t = ui.battle.towers.find((x) => x.def.id === el.dataset.prio);
     if (t) ui.battle.setPriority(t, el.value as Priority);
+    el.blur(); // give the keyboard back to the battle shortcuts
     return;
   }
   const champId = el.dataset.equip;
@@ -218,13 +219,13 @@ window.addEventListener('pointerup', (e) => {
 });
 
 window.addEventListener('keydown', (e) => {
-  if (!ui.battle || (e.target as HTMLElement).tagName === 'INPUT') return;
+  if (!ui.battle || ['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
   if (e.code === 'Space') { e.preventDefault(); if (ui.battle.towers.length) ui.battle.startWave(); }
   if (e.key === 'Escape') { ui.battle.selectedRoster = null; ui.battle.selectedTower = null; ui.battle.selectedEnemy = null; renderSide(); }
   if (/^[1-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
     const t = ui.battle.towers[Number(e.key) - 1];
     if (t && ui.battle.castUlt(t)) refreshLive();
   }
-  if (e.key === 'p') ui.battle.paused = !ui.battle.paused;
+  if (e.key.toLowerCase() === 'p') ui.battle.paused = !ui.battle.paused;
 });
 

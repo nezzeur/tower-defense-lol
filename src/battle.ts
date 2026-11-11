@@ -422,6 +422,7 @@ export class Battle {
       drag = null;
       cursor();
     });
+    cv.addEventListener('pointercancel', () => { drag = null; this.dragging = null; cursor(); this.ev.onChange(); });
     cv.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       this.selectedRoster = null;
@@ -536,6 +537,7 @@ export class Battle {
       this.lives = Math.min(MAX_LIVES, this.lives + 5);
     }
     this.spellCd[id] = SPELLS[id].cd;
+    if (this.visual) sfx(id === 'heal' ? 'upgrade' : 'ult');
   }
 
   // ---------- Active ultimates ----------
@@ -643,15 +645,17 @@ export class Battle {
   }
 
   private sortTargets(list: Enemy[], t: Tower): Enemy[] {
+    // Distance left to the nexus: lanes differ in length, so raw progress is not comparable.
+    const left = (e: Enemy) => this.lanes[e.lane].len - e.s;
     switch (t.priority) {
-      case 'last': return list.sort((a, b) => a.s - b.s);
+      case 'last': return list.sort((a, b) => left(b) - left(a));
       case 'strong': return list.sort((a, b) => b.hp - a.hp);
       case 'weak': return list.sort((a, b) => a.hp - b.hp);
       case 'close': {
         const d = (e: Enemy) => Math.hypot(e.x - t.x, e.y - t.y);
         return list.sort((a, b) => d(a) - d(b));
       }
-      default: return list.sort((a, b) => b.s - a.s);
+      default: return list.sort((a, b) => left(a) - left(b));
     }
   }
 
@@ -1020,7 +1024,9 @@ export class Battle {
     // Placement preview
     if (this.hover && (this.selectedRoster || this.dragging)) {
       const { c, r } = this.hover;
-      const ok = this.canPlace(c, r) && (this.selectedTower || this.slotsLeft() > 0);
+      const id = this.selectedRoster ?? this.dragging!.def.id;
+      const onBoard = this.towers.some((t) => t.def.id === id);
+      const ok = this.canPlace(c, r) && (onBoard || this.slotsLeft() > 0);
       g.fillStyle = ok ? 'rgba(10,200,185,0.22)' : 'rgba(255,60,60,0.28)';
       g.strokeStyle = ok ? 'rgba(10,200,185,0.8)' : 'rgba(255,80,80,0.8)';
       g.lineWidth = 2;
@@ -1029,8 +1035,7 @@ export class Battle {
       g.fill();
       g.stroke();
       if (ok) {
-        const id = this.selectedRoster ?? this.dragging!.def.id;
-        this.rangeRing(g, (c + 0.5) * TILE, (r + 0.5) * TILE, computeStats(champ(id)).range, 'rgba(10,200,185,0.7)');
+        this.rangeRing(g, (c + 0.5) * TILE, (r + 0.5) * TILE, this.statsAt(champ(id), c, r).range, 'rgba(10,200,185,0.7)');
         // Ghost of the champion under the cursor
         const img = squareImage(id);
         if (img) {
@@ -1140,7 +1145,7 @@ export class Battle {
       if (f.kind !== 'text') continue;
       const k = 1 - f.t / f.max;
       g.globalAlpha = Math.max(0, k);
-      g.font = '800 15px Inter, system-ui, sans-serif';
+      g.font = '800 15px "Source Sans 3", system-ui, sans-serif';
       const y = f.y - (1 - k) * 22;
       g.lineWidth = 3;
       g.strokeStyle = 'rgba(0,0,0,0.75)';
@@ -1160,7 +1165,7 @@ export class Battle {
   private drawTileTip(g: CanvasRenderingContext2D, c: number, r: number, f: FeatureKind): void {
     const info = FEATURE_INFO[f];
     g.font = '700 13px Cinzel, serif';
-    const tw = Math.max(g.measureText(info.name).width, (g.font = '500 12px Inter, sans-serif', g.measureText(info.desc).width)) + 20;
+    const tw = Math.max(g.measureText(info.name).width, (g.font = '500 12px "Source Sans 3", system-ui, sans-serif', g.measureText(info.desc).width)) + 20;
     const x = Math.min(W - tw - 6, Math.max(6, (c + 0.5) * TILE - tw / 2)), y = r * TILE > 70 ? r * TILE - 52 : (r + 1) * TILE + 6;
     g.fillStyle = 'rgba(15,36,64,0.95)';
     g.fillRect(x, y, tw, 44);
@@ -1172,7 +1177,7 @@ export class Battle {
     g.font = '700 13px Cinzel, serif';
     g.fillText(info.name, x + 10, y + 18);
     g.fillStyle = '#e6edf6';
-    g.font = '500 12px Inter, sans-serif';
+    g.font = '500 12px "Source Sans 3", system-ui, sans-serif';
     g.fillText(info.desc, x + 10, y + 35);
   }
 
@@ -1411,7 +1416,7 @@ export class Battle {
       g.fillStyle = t.def.color;
       g.fillRect(x - R, y - R, R * 2, R * 2);
       g.fillStyle = '#010a13';
-      g.font = 'bold 13px Inter, sans-serif';
+      g.font = 'bold 13px "Source Sans 3", system-ui, sans-serif';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.fillText(initials(t.def.name), x, y + 1);
@@ -1437,7 +1442,7 @@ export class Battle {
     g.lineWidth = 1.5;
     g.stroke();
     g.fillStyle = '#f0e6d2';
-    g.font = '700 9px Inter, sans-serif';
+    g.font = '700 9px "Source Sans 3", system-ui, sans-serif';
     g.textAlign = 'center';
     g.fillText(String(lvl), x + 15, y + 18);
     // Active ultimate: charge arc, pulsing ring + R badge when ready
@@ -1456,7 +1461,7 @@ export class Battle {
       g.arc(x - 15, y - 15, 7, 0, Math.PI * 2);
       g.fill();
       g.fillStyle = '#010a13';
-      g.font = '800 9px Inter, sans-serif';
+      g.font = '800 9px "Source Sans 3", system-ui, sans-serif';
       g.textAlign = 'center';
       g.fillText('R', x - 15, y - 12);
     } else {

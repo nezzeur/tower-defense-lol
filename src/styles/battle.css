@@ -120,7 +120,15 @@
 .team-slot.placed img { filter: saturate(0.4) brightness(0.55); }
 .go { display: flex; flex-direction: column; gap: 6px; }
 
-@media (max-width: 1200px) { .bmain { grid-template-columns: 1fr; } .hud-panel { max-height: none; } }
+/* Narrow screens: the board comes first at full width, both info columns sit side by side under it. */
+@media (max-width: 1200px) {
+  .battle { height: auto; min-height: 100vh; grid-template-rows: auto auto auto; }
+  .bmain { grid-template-columns: 1fr 1fr; }
+  .board { grid-column: 1 / -1; order: -1; }
+  .battle-canvas { width: 100%; height: auto; max-height: none; }
+  .hud-panel { max-height: 300px; }
+}
+@media (max-width: 640px) { .bmain { grid-template-columns: 1fr; } }
 @media (max-width: 900px) { .battle { height: auto; } .speed { margin-left: 0; } }
 
 /* Active ultimates, synergies, enemy card */

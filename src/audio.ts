@@ -9,6 +9,10 @@ let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noiseBuf: AudioBuffer | null = null;
 const last: Partial<Record<Sfx, number>> = {};
+/** Where tone()/noise() connect: the master gain, or a per-sound group so long sounds can be cut. */
+let bus: AudioNode | null = null;
+const STOPPABLE: Sfx[] = ['chestCharge'];
+const groups: Partial<Record<Sfx, GainNode>> = {};
 // Minimum gap (ms) between two plays of the same sound, so busy fights don't stack.
 const GAP: Partial<Record<Sfx, number>> = { shot: 60, hit: 60, death: 45, lifeLost: 120, gold: 70, click: 30, card: 80, ult: 150 };
 
@@ -58,7 +62,7 @@ function tone(c: AudioContext, o: {
   g.gain.setValueAtTime(0.0001, t0);
   g.gain.linearRampToValueAtTime(o.v, t0 + a);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + o.d);
-  osc.connect(g).connect(master!);
+  osc.connect(g).connect(bus ?? master!);
   osc.start(t0);
   osc.stop(t0 + o.d + 0.03);
 }
@@ -82,7 +86,7 @@ function noise(c: AudioContext, o: { t?: number; d: number; v: number; f: number
   g.gain.setValueAtTime(0.0001, t0);
   g.gain.linearRampToValueAtTime(o.v, t0 + 0.01);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + o.d);
-  src.connect(flt).connect(g).connect(master!);
+  src.connect(flt).connect(g).connect(bus ?? master!);
   src.start(t0);
   src.stop(t0 + o.d + 0.03);
 }
@@ -154,5 +158,21 @@ export function sfx(name: Sfx): void {
   last[name] = now;
   const c = getCtx();
   if (!c || c.state !== 'running' || !master) return;
-  try { PLAY[name](c); } catch { /* audio failure must never break the game */ }
+  try {
+    if (STOPPABLE.includes(name)) {
+      const grp = c.createGain();
+      grp.connect(master);
+      groups[name] = grp;
+      bus = grp;
+    }
+    PLAY[name](c);
+  } catch { /* audio failure must never break the game */ } finally { bus = null; }
+}
+
+/** Fades out a long sound that is still playing (only sounds listed in STOPPABLE). */
+export function stopSfx(name: Sfx): void {
+  const grp = groups[name];
+  if (!grp || !ctx) return;
+  grp.gain.setTargetAtTime(0, ctx.currentTime, 0.03);
+  delete groups[name];
 }

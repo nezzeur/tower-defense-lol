@@ -259,7 +259,7 @@ const WAVES = 30;
 const FINAL_WAVES = 40;
 
 /** Difficulty multiplier by global map index (tuned with scripts/sim.ts). */
-export const MAP_CURVE = { base: 1.5, growth: 1.24 };
+export const MAP_CURVE = { base: 1.5, growth: 1.25 };
 
 function buildMaps(): MapDef[] {
   const out: MapDef[] = [];

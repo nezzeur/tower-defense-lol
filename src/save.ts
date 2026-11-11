@@ -110,6 +110,8 @@ export function importSave(code: string): void {
 }
 
 export function resetSave(): void {
-  store.data = fresh();
+  // Progress is wiped; device preferences (sound, game speed) are kept.
+  const { volume, muted, speed } = store.data;
+  store.data = { ...fresh(), volume, muted, speed };
   persist();
 }
