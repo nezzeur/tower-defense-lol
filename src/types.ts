@@ -165,6 +165,25 @@ export interface ItemDef {
   dd?: number;
   category: 'Dégâts' | 'Vitesse' | 'Utilitaire';
   desc: string;
+  /** Shop price (0 for forged items). */
   price: number;
+  /** Forge recipe (material id -> amount). Forged items are not sold in the shop. */
+  craft?: Record<string, number>;
+  /** Region whose materials the recipe mostly uses (forge grouping). */
+  origin?: string;
   apply: (s: Stats) => void;
+}
+
+/** Loot material dropped by monsters; its rarity sets the fixed drop chance per roll. */
+export interface MaterialDef {
+  id: string;
+  name: string;
+  icon: string;
+  /** 1 commun, 2 rare, 3 épique, 4 légendaire. */
+  rarity: 1 | 2 | 3 | 4;
+  /** Region id whose maps drop it (any monster there). */
+  region?: string;
+  /** Enemy ids that drop it on any map; 'boss' = every final boss, 'any' = every monster. */
+  from?: string[];
+  desc: string;
 }

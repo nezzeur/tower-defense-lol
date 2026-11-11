@@ -3,7 +3,7 @@
 // Usage: npx tsx scripts/sim.ts [starter] [maxHours]
 import { Battle, TILE, TUNE } from '../src/battle';
 import { CHAMPIONS } from '../src/data/champions';
-import { ITEMS } from '../src/data/items';
+import { SHOP_ITEMS as ITEMS } from '../src/data/items';
 import { applyCurve, COLS, MAP_CURVE, MAPS, ROWS } from '../src/data/maps';
 import {
   BALANCE, chestPool, claimChest, chestPrice, computeStats, isUnlocked, level, levelCost, MAX_LEVEL, openChest, rollReward, stars, teamSlots,

@@ -1,6 +1,8 @@
 import { FEATURE_INFO } from '../art/mapArt';
 import { buildWorld, NODE_PX, REGION_OF, REGIONS, S, WH, WorldAnim, WW, type Region } from '../art/worldArt';
+import { MATERIALS } from '../data/loot';
 import { MAPS, MAP_BY_ID } from '../data/maps';
+import { matChip } from './inventory';
 import { enemyName, isArena, isUnlocked, pct, rewardChance, rewardFor, stars, teamSlots, unlockReason } from '../game';
 import { store } from '../save';
 import { esc, mapThumb, portrait, starRow, ui } from './common';
@@ -70,6 +72,8 @@ export function mapsScreen(): string {
         <h2>${esc(reg.name)}</h2><p class="muted">${esc(reg.desc)}</p>
         <div class="progress"><div style="width:${(regionStars(reg) / (reg.maps.length * 5)) * 100}%"></div></div>
         <div class="small">${regionStars(reg)} / ${reg.maps.length * 5} ★</div>
+        <div class="small muted" style="margin-top:8px">Butin propre à la région</div>
+        <div class="mat-row">${MATERIALS.filter((m) => m.region === reg.id).map((m) => matChip(m, String(store.data.mats[m.id] ?? 0))).join('')}</div>
       </div>
       <div class="level-list">${reg.maps.map((id) => mapCard(id, cur)).join('')}</div>`
     : `<div class="region-head"><h2>Runeterra</h2><p class="muted">Choisis une région à explorer.</p></div>

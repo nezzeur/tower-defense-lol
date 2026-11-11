@@ -1,5 +1,5 @@
 import { chestIdleHTML } from '../art/chest';
-import { ITEMS } from '../data/items';
+import { SHOP_ITEMS as ITEMS } from '../data/items';
 import { champ, CHEST_CHOICES, chestPool, chestPrice, EPIC_PITY, fmt } from '../game';
 import { store } from '../save';
 import { artCard, chip, esc, itemIcon, portrait, RARITY, ROLE_ICON } from './common';
@@ -60,7 +60,7 @@ export function shopScreen(): string {
     <section>
       <div class="shop-head"><h2>Objets</h2>
         <div class="fgroup">${chip('data-sf', '', 'Tous', !shop.cat)}${cats.map((c) => chip('data-sf', c, c, shop.cat === c)).join('')}</div>
-        <div class="muted small">${store.data.items.length}/${ITEMS.length} possédés · un objet par champion</div></div>
+        <div class="muted small">${ITEMS.filter((i) => store.data.items.includes(i.id)).length}/${ITEMS.length} achetés · un objet par champion · d'autres objets se fabriquent à la Forge</div></div>
       <div class="shop-items">${items}</div>
     </section>
   </div>`;

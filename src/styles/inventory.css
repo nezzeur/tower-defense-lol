@@ -1,0 +1,38 @@
+/* Inventory + forge */
+.m1 { --rc: var(--r1); } .m2 { --rc: var(--r2); } .m3 { --rc: var(--r3); } .m4 { --rc: var(--r4); }
+.odd.m1, .odd.m2, .odd.m3, .odd.m4 { border-top-color: var(--rc); }
+.inventory, .forge { display: flex; flex-direction: column; gap: 18px; }
+.loot-rules .odds { grid-template-columns: repeat(4, 1fr); max-width: 640px; margin-bottom: 0; }
+.inv-group { margin: 14px 0 8px; font-size: 13px; color: var(--gold2); }
+.mat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.mat-tile { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; background: var(--fill); border: 1px solid var(--gold5); border-left: 3px solid var(--rc); }
+.mat-tile.none { opacity: 0.55; }
+.mat-ico { width: 40px; height: 40px; display: grid; place-items: center; font-size: 22px; background: var(--bg2); border: 1px solid var(--rc); box-shadow: var(--inset-line); }
+.mat-body { display: flex; flex-direction: column; min-width: 0; }
+.mat-body b { font: 700 13px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; }
+.rar.m1, .rar.m2, .rar.m3, .rar.m4 { font-style: normal; color: var(--rc); font-weight: 700; }
+.mat-n { font: 700 20px var(--font-body); color: var(--gold1); min-width: 44px; text-align: right; }
+.mat { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px 1px 2px; background: var(--bg2); border: 1px solid var(--rc); font-size: 12px; }
+.mat i { font-style: normal; width: 22px; height: 22px; display: grid; place-items: center; font-size: 14px; }
+.mat b { color: var(--gold1); }
+.mat-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.inv-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 8px; }
+.inv-item { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; background: var(--fill); border: 1px solid var(--gold5); }
+.inv-item.forged { border-color: var(--teal2); }
+.inv-item > div:nth-child(2) { display: flex; flex-direction: column; min-width: 0; }
+.inv-item b { font: 700 13px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; }
+.forge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+.forge-card { display: flex; flex-direction: column; gap: 10px; padding: 12px; animation: fadeUp 0.35s ease both; animation-delay: var(--d); }
+.forge-card.ready { border-image: var(--frame-hi) 1; }
+.forge-card.owned { border-color: var(--teal2); }
+.forge-top { display: flex; gap: 12px; align-items: flex-start; }
+.forge-top b { margin-right: 6px; font: 700 14px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; }
+.forge-top p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.needs { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.need { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.need b { color: var(--red); }
+.need.ok { color: var(--text); } .need.ok b { color: var(--green); }
+.forge-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.forge-foot select { font-size: 12px; padding: 3px 6px; max-width: 160px; }
+.result-loot { display: flex; justify-content: center; margin: 4px 0 10px; }
+.result-loot .mat-row { justify-content: center; max-width: 420px; }

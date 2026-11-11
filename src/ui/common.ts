@@ -9,7 +9,7 @@ import type { ChampionDef, Stats } from '../types';
 import { render } from './index';
 import { renderSide } from './battleHud';
 
-export type Screen = 'maps' | 'champions' | 'shop' | 'options' | 'battle';
+export type Screen = 'maps' | 'champions' | 'shop' | 'inventory' | 'forge' | 'options' | 'battle';
 
 export const app = document.getElementById('app')!;
 /** Shared mutable UI state (ES module bindings can't be reassigned across files). */

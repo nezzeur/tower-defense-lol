@@ -5,6 +5,8 @@ import { Battle, initials, PRIORITIES, SPELLS, type Enemy, type SpellId, type To
 import { SYN_TIERS, synText, teamSynergies } from '../data/synergies';
 import type { Priority } from '../types';
 import { ENEMIES } from '../data/enemies';
+import { lootRolls, lootTable, MAT_BY_ID, MATERIALS } from '../data/loot';
+import { matChip } from './inventory';
 import { MAP_BY_ID } from '../data/maps';
 import { REGIONS } from '../art/worldArt';
 import { champ, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots } from '../game';
@@ -158,6 +160,11 @@ function mapInfoPanel(b: Battle): string {
     </div>
     ${(b.map.features?.length || b.map.lanes?.length) ? `<div class="hud-card"><div class="hud-title">Particularités</div>${featureList(b.map)}</div>` : ''}
     <div class="hud-card">
+      <div class="hud-title">Butin de la région</div>
+      <div class="mat-row">${MATERIALS.filter((x) => x.region === m.region).map((x) => matChip(x, String(store.data.mats[x.id] ?? 0))).join('') || '<span class="small muted">Aucun</span>'}</div>
+      <div class="small muted" style="margin-top:6px">Clique un monstre pour voir ce qu'il peut lâcher.</div>
+    </div>
+    <div class="hud-card">
       <div class="hud-title">Sorts d'invocateur</div>
       ${(Object.keys(SPELLS) as SpellId[]).map((id) => `<div class="mi-spell"><span>${SPELLS[id].icon}</span><div><b>${esc(SPELLS[id].name)}</b><span class="small muted">${esc(SPELLS[id].desc)} · ${SPELLS[id].cd}s</span></div></div>`).join('')}
     </div>
@@ -210,9 +217,19 @@ function wavePanel(b: Battle): string {
         <div><span>Durée</span><b>${fmtTime(b.runTime)}</b></div><div><span>Champions</span><b>${b.towers.length}/${teamSlots()}</b></div></div>
     </div>
     <div class="hud-card">
+      <div class="hud-title">Butin de la partie</div>
+      ${lootRow(b.runLoot) || '<span class="small muted">Rien pour l\'instant.</span>'}
+    </div>
+    <div class="hud-card">
       <div class="hud-title">Dégâts</div>
       ${meter || '<span class="small muted">Place des champions pour voir leurs dégâts.</span>'}
     </div>`;
+}
+
+/** Material chips for a loot record, rarest first. */
+function lootRow(loot: Record<string, number>): string {
+  const ids = Object.keys(loot).sort((x, y) => MAT_BY_ID[y].rarity - MAT_BY_ID[x].rarity || loot[y] - loot[x]);
+  return ids.length ? `<div class="mat-row">${ids.map((id) => matChip(MAT_BY_ID[id], `+${loot[id]}`)).join('')}</div>` : '';
 }
 
 function synergyList(b: Battle): string {
@@ -244,7 +261,9 @@ function enemyCard(b: Battle, e: Enemy): string {
     <div class="run-line"><span>Vitesse</span><b>${speed.toFixed(2)} case/s${speed < d.speed ? ` (base ${d.speed})` : ''}</b></div>
     <div class="run-line"><span>Armure</span><b>${armor}</b></div>
     <div class="run-line"><span>Butin</span><b>◆ ${fmt(b.enemyReward(e))}</b></div>
-    <div class="cc-tags">${status}</div>`;
+    <div class="cc-tags">${status}</div>
+    <div class="small muted" style="margin-top:6px">Butin possible${lootRolls(d) > 1 ? ` · ${lootRolls(d)} tirages` : ''}</div>
+    <div class="mat-row">${lootTable(d, b.map.region ?? '').map((x) => matChip(x)).join('')}</div>`;
 }
 
 function ultState(b: Battle, id: string): { t: Tower; i: number; p: number } | null {
@@ -334,6 +353,7 @@ function showResult(win: boolean, wave: number): void {
     <p>${win ? `${esc(ui.battle.map.name)} terminée !` : `Tu as tenu jusqu'à la vague ${wave}.`}</p>
     <p class="small muted">Ton or, tes niveaux et tes objets sont conservés.</p>
     ${reward}
+    ${lootRow(ui.battle.runLoot) ? `<div class="small muted">Butin de la partie</div><div class="result-loot">${lootRow(ui.battle.runLoot)}</div>` : ''}
     <div class="row"><button class="btn gold" data-restart>Rejouer</button>
       ${ui.battle.canChallengeBoss() ? '<button class="btn boss" data-boss>Retenter le boss ⚔</button>' : ''}
       <button class="btn" data-leave>Changer de carte</button></div>

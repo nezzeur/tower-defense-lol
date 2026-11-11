@@ -1,6 +1,6 @@
 import { loadingUrl, squareUrl } from '../art/champArt';
 import { ITEM_BY_ID } from '../data/items';
-import { champ, claimChest, openChest, level, teamSlots, tryLevelUp, ULT_LEVELS, ultRank } from '../game';
+import { champ, claimChest, craftItem, openChest, level, teamSlots, tryLevelUp, ULT_LEVELS, ultRank } from '../game';
 import { playChestOpening } from '../art/chest';
 import { applyVolume, sfx } from '../audio';
 import type { SpellId } from '../battle';
@@ -71,6 +71,14 @@ app.addEventListener('click', (e) => {
       persist();
       sfx('gold');
       flash(`${it.icon} ${esc(it.name)} acheté`);
+    }
+    return render();
+  }
+  if (d.craft) {
+    if (craftItem(d.craft)) {
+      persist();
+      sfx('upgrade');
+      flash(`${ITEM_BY_ID[d.craft].icon} ${esc(ITEM_BY_ID[d.craft].name)} forgé`);
     }
     return render();
   }

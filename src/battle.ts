@@ -6,6 +6,7 @@ import { CREATURE_HEIGHT, drawCreature } from './art/creatures';
 import { shade } from './art/color';
 import { sfx } from './audio';
 import { ENEMIES } from './data/enemies';
+import { MAT_BY_ID, rollLoot } from './data/loot';
 import { teamSynergies, type SynStat } from './data/synergies';
 import { COLS, ROWS } from './data/maps';
 import {
@@ -150,6 +151,8 @@ export class Battle {
   runKills = 0;
   runGold = 0;
   runTime = 0;
+  /** Materials looted this run (id -> amount). */
+  runLoot: Record<string, number> = {};
   waveTotal = 0;
   lives = START_LIVES;
   waveActive = false;
@@ -516,6 +519,7 @@ export class Battle {
     this.selectedEnemy = null;
     for (const t of this.towers) { t.ultCd = t.def.active.cd; t.buffs = []; t.runStacks = 0; t.ramp = 0; t.hits = 0; t.cd = 0.3; t.dmgDone = 0; t.kills = 0; }
     this.runKills = this.runGold = this.runTime = 0;
+    this.runLoot = {};
     this.spawnCount = 0;
     for (const tu of this.turrets) tu.cd = 0;
     store.data.runs++;
@@ -952,6 +956,7 @@ export class Battle {
     if (e.def.boss || e.def.shape === 'boss') {
       this.fx.push({ kind: 'text', x: e.x, y: e.y - 24, t: 0, max: 1.2, color: '#f5c542', text: `+${fmtShort(gold)}` });
     }
+    this.dropLoot(e);
     if (!src) return;
     src.kills++;
     const ks = src.stats.killStack;
@@ -963,6 +968,20 @@ export class Battle {
         // Per-run stacks are a fraction of the champion's damage, so they keep their weight at high levels.
         src.runStacks += ks.amount * src.stats.dmg;
       }
+    }
+  }
+
+  /** Loot roll for one kill: fixed chance per material rarity, straight into the inventory. */
+  private dropLoot(e: Enemy): void {
+    const loot = rollLoot(e.def, this.map.region ?? '');
+    let row = 0;
+    for (const [id, n] of Object.entries(loot)) {
+      store.data.mats[id] = (store.data.mats[id] ?? 0) + n;
+      this.runLoot[id] = (this.runLoot[id] ?? 0) + n;
+      const m = MAT_BY_ID[id];
+      if (!this.visual || m.rarity < 2) continue;
+      this.fx.push({ kind: 'text', x: e.x, y: e.y - 30 - 16 * row++, t: 0, max: 1.4, color: LOOT_COLOR[m.rarity], text: `${m.icon} +${n}` });
+      sfx('gold');
     }
   }
 
@@ -1517,6 +1536,8 @@ export class Battle {
     }
   }
 }
+
+const LOOT_COLOR = ['', '#a09b8c', '#4a8fd8', '#c084fc', '#ffb347'];
 
 function distToSeg(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax, dy = by - ay;

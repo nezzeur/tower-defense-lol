@@ -199,3 +199,18 @@ export function fmt(n: number): string {
   while (n >= 1000 && u < units.length - 1) { n /= 1000; u++; }
   return `${n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0)}${units[u]}`;
 }
+
+/** True when the inventory holds every material of the item's forge recipe (and it is not owned yet). */
+export function canCraft(itemId: string): boolean {
+  const it = ITEM_BY_ID[itemId];
+  if (!it?.craft || store.data.items.includes(itemId)) return false;
+  return Object.entries(it.craft).every(([m, n]) => (store.data.mats[m] ?? 0) >= n);
+}
+
+/** Forges an item: spends the recipe's materials and adds the item to the inventory. */
+export function craftItem(itemId: string): boolean {
+  if (!canCraft(itemId)) return false;
+  for (const [m, n] of Object.entries(ITEM_BY_ID[itemId].craft!)) store.data.mats[m] -= n;
+  store.data.items.push(itemId);
+  return true;
+}
