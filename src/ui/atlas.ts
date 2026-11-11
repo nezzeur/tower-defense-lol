@@ -1,7 +1,7 @@
 import { FEATURE_INFO } from '../art/mapArt';
 import { buildWorld, NODE_PX, REGION_OF, REGIONS, S, WH, WorldAnim, WW, type Region } from '../art/worldArt';
 import { MAPS, MAP_BY_ID } from '../data/maps';
-import { enemyName, isArena, isUnlocked, rewardFor, stars, teamSlots, unlockReason } from '../game';
+import { enemyName, isArena, isUnlocked, pct, rewardChance, rewardFor, stars, teamSlots, unlockReason } from '../game';
 import { store } from '../save';
 import { esc, mapThumb, portrait, starRow, ui } from './common';
 import { render } from './index';
@@ -37,7 +37,7 @@ function mapCard(id: string, cur: string): string {
       ${open ? `${starRow(stars(m.id))}<div class="small">Record <b>${best}</b>/${m.waves} · Boss : ${esc(enemyName(m.finalBoss))}</div>`
         : `<div class="lock small">🔒 ${esc(unlockReason(m) ?? '')}</div>`}
       <div class="level-foot">
-        ${rw ? `<span class="reward-chip">${portrait(rw, 22, !store.data.owned.includes(rw.id))}${store.data.owned.includes(rw.id) ? esc(rw.name) : 'Récompense ???'}</span>` : '<span></span>'}
+        ${rw ? `<span class="reward-chip" title="Chance que le boss final lâche ce champion à chaque victoire. Elle augmente après chaque échec.">${portrait(rw, 22, !store.data.owned.includes(rw.id))}${store.data.owned.includes(rw.id) ? esc(rw.name) : `Butin du boss · ${pct(rewardChance(m.id))}`}</span>` : '<span></span>'}
         <button class="btn start" data-map="${id}" ${open ? '' : 'disabled'}>Jouer ▶</button>
       </div>
     </div>

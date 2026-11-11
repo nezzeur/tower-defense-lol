@@ -6,7 +6,7 @@ import { CHAMPIONS } from '../src/data/champions';
 import { ITEMS } from '../src/data/items';
 import { applyCurve, COLS, MAP_CURVE, MAPS, ROWS } from '../src/data/maps';
 import {
-  BALANCE, chestPool, claimChest, chestPrice, computeStats, isUnlocked, level, levelCost, MAX_LEVEL, openChest, rewardFor, stars, teamSlots,
+  BALANCE, chestPool, claimChest, chestPrice, computeStats, isUnlocked, level, levelCost, MAX_LEVEL, openChest, rollReward, stars, teamSlots,
   tryLevelUp,
 } from '../src/game';
 import { store } from '../src/save';
@@ -168,8 +168,7 @@ while (time < maxHours * 3600) {
       + `champs ${store.data.owned.length} avgLv ${avg.toFixed(1)} items ${store.data.items.length} slots ${teamSlots()}`);
   }
   if (res.win) {
-    const rw = rewardFor(m.id);
-    if (rw && !store.data.owned.includes(rw.id)) store.data.owned.push(rw.id);
+    rollReward(m.id);
   }
 }
 

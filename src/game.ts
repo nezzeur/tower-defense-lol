@@ -154,6 +154,36 @@ export function rewardFor(mapId: string): ChampionDef | undefined {
   return CHAMPIONS.find((c) => c.reward === mapId);
 }
 
+/** Boss drop: chance on the first reward map, and how fast it shrinks on each later (harder) one. */
+export const REWARD = { base: 0.05, decay: 0.82 };
+
+/**
+ * Chance that beating this map's final boss drops its champion right now (0 when there is none left to win).
+ * Harder maps start lower; every failed attempt adds the starting chance again (bad-luck protection).
+ */
+export function rewardChance(mapId: string): number {
+  const rw = rewardFor(mapId);
+  if (!rw || store.data.owned.includes(rw.id)) return 0;
+  const rank = MAPS.filter((m) => rewardFor(m.id)).findIndex((m) => m.id === mapId);
+  const start = REWARD.base * REWARD.decay ** Math.max(0, rank);
+  return Math.min(1, start * (1 + (store.data.rewardTries[mapId] ?? 0)));
+}
+
+/** Rolls the boss drop after a win; returns the champion when it drops (and adds it to the roster). */
+export function rollReward(mapId: string): ChampionDef | null {
+  const rw = rewardFor(mapId), chance = rewardChance(mapId);
+  if (!rw || chance <= 0) return null;
+  if (Math.random() < chance) {
+    store.data.owned.push(rw.id);
+    delete store.data.rewardTries[mapId];
+    return rw;
+  }
+  store.data.rewardTries[mapId] = (store.data.rewardTries[mapId] ?? 0) + 1;
+  return null;
+}
+
+export const pct = (v: number): string => `${v < 0.1 ? (v * 100).toFixed(1).replace('.0', '') : Math.round(v * 100)} %`;
+
 export function tryLevelUp(id: string): boolean {
   const lvl = level(id);
   const cost = levelCost(lvl);

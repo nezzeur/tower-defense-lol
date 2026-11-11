@@ -7,7 +7,8 @@ import type { Priority } from '../types';
 import { ENEMIES } from '../data/enemies';
 import { MAP_BY_ID } from '../data/maps';
 import { REGIONS } from '../art/worldArt';
-import { champ, enemyName, fmt, level, rewardFor, stars, teamSlots } from '../game';
+import { champ, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots } from '../game';
+import { sfx } from '../audio';
 import { persist, store } from '../save';
 import type { MapDef } from '../types';
 import { app, esc, itemSelect, abilityRow, levelButtons, mapThumb, portrait, starRow, statLines, ui, ultButton } from './common';
@@ -152,7 +153,7 @@ function mapInfoPanel(b: Battle): string {
       <div class="hud-title">Boss final</div>
       <div class="mi-boss">${creatureIcon(m.finalBoss)}<div><b>${esc(enemyName(m.finalBoss))}</b>
         <span class="small muted">Vague ${m.waves} · PV x${Math.round(ENEMIES[m.finalBoss].hp / ENEMIES.melee.hp)} d'un sbire</span></div></div>
-      ${rw ? `<div class="mi-boss">${portrait(rw, 40, !store.data.owned.includes(rw.id))}<div><b>Récompense</b><span class="small muted">${store.data.owned.includes(rw.id) ? esc(rw.name) + ' (obtenu)' : 'Champion mystère'}</span></div></div>` : ''}
+      ${rw ? `<div class="mi-boss">${portrait(rw, 40, !store.data.owned.includes(rw.id))}<div><b>Butin du boss</b><span class="small muted">${store.data.owned.includes(rw.id) ? esc(rw.name) + ' (obtenu)' : `Champion mystère · ${pct(rewardChance(m.id))} par victoire`}</span></div></div>` : ''}
     </div>
     ${(b.map.features?.length || b.map.lanes?.length) ? `<div class="hud-card"><div class="hud-title">Particularités</div>${featureList(b.map)}</div>` : ''}
     <div class="hud-card">
@@ -315,11 +316,16 @@ function showResult(win: boolean, wave: number): void {
   if (!ov || !ui.battle) return;
   let reward = '';
   if (win) {
-    const rw = rewardFor(ui.battle.map.id);
-    if (rw && !store.data.owned.includes(rw.id)) {
-      store.data.owned.push(rw.id);
+    const id = ui.battle.map.id, rw = rewardFor(id), had = rewardChance(id);
+    if (rw && had > 0) {
+      if (rollReward(id)) {
+        sfx('chestBurst');
+        reward = `<div class="reward got">${portrait(rw, 56)}<div>Le boss lâche un champion !<br><b>${esc(rw.name)}</b> — ${esc(rw.title)}</div></div>`;
+      } else {
+        reward = `<div class="reward miss">${portrait(rw, 56, true)}<div>Pas de champion cette fois (${pct(had)} de chance).<br>
+          Prochaine victoire : <b>${pct(rewardChance(id))}</b></div></div>`;
+      }
       persist();
-      reward = `<div class="reward">${portrait(rw, 56)}<div>Nouveau champion : <b>${esc(rw.name)}</b></div></div>`;
     }
   }
   ov.innerHTML = `<div class="result ${win ? 'win' : 'lose'}">

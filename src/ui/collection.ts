@@ -26,7 +26,7 @@ export function champsScreen(): string {
   const totalLv = owned.reduce((n, id) => n + level(id), 0);
   const grid = list.map((c, i) => {
     const has = owned.includes(c.id);
-    const src = c.reward ? `Récompense : ${MAP_BY_ID[c.reward].name}` : c.starter ? 'Champion de départ' : 'Coffre Hextech';
+    const src = c.reward ? `Butin du boss : ${MAP_BY_ID[c.reward].name}` : c.starter ? 'Champion de départ' : 'Coffre Hextech';
     const lvl = level(c.id), rank = ultRank(lvl);
     return `<button class="coll-card r${c.rarity} ${has ? '' : 'locked'} ${c.id === ui.selectedChamp ? 'sel' : ''}"
       ${has ? `data-champ="${c.id}"` : 'disabled'} style="--d:${Math.min(i, 12) * 30}ms">
