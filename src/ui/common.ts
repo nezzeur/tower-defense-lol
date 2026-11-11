@@ -78,7 +78,7 @@ export function statLines(s: Stats): string[] {
   if (s.livesPerWave) L.push(`Vies/vague <b>+${s.livesPerWave}</b>`);
   if (s.ramp) L.push(`Montée en puissance <b>+${pct(s.ramp.max)}</b>`);
   if (s.bossMult) L.push(`Contre boss <b>x${s.bossMult.toFixed(2)}</b>`);
-  if (s.killStack) L.push(`Cumul/élim. <b>+${s.killStack.amount.toFixed(2)}</b>${s.killStack.persistent ? ' (permanent)' : ''}`);
+  if (s.killStack) L.push(s.killStack.persistent ? `Cumul/élim. <b>+${s.killStack.amount.toFixed(2)}</b> (permanent)` : `Cumul/élim. <b>+${Math.round(s.killStack.amount * 100)} %</b> (partie)`);
   return L;
 }
 

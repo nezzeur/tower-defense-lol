@@ -252,7 +252,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'missfortune', name: 'Miss Fortune', title: 'La Chasseuse de primes', role: 'Tireur', region: 'Bilgewater',
     color: '#e74c3c', rarity: 2, reward: 'botlane',
     passive: 'Doublé : tire sur 2 cibles.',
-    base: base({ dmg: 12, rate: 1.1, range: 3.2, type: 'multi', targets: 2 }),
+    base: base({ dmg: 14, rate: 1.1, range: 3.2, type: 'multi', targets: 2 }),
     ult: {
       name: 'Pluie de balles', desc: '+1 cible par rang.',
       apply: (s, r) => { s.targets += r; s.dmg *= 1 + 0.1 * r; },
@@ -265,8 +265,8 @@ export const CHAMPIONS: ChampionDef[] = [
   {
     id: 'nasus', name: 'Nasus', title: 'Le Gardien des sables', role: 'Combattant', region: 'Shurima',
     color: '#c9a227', rarity: 3, reward: 'jungle',
-    passive: 'Frappe siphonnante : +0,15 dégât PERMANENT par élimination.',
-    base: base({ dmg: 14, rate: 0.9, range: 1.6, killStack: { amount: 0.15, persistent: true } }),
+    passive: 'Frappe siphonnante : +0,2 dégât PERMANENT par élimination.',
+    base: base({ dmg: 16, rate: 0.9, range: 2, killStack: { amount: 0.2, persistent: true } }),
     ult: {
       name: 'Fureur des sables', desc: 'Accumule plus vite, portée accrue.',
       apply: (s, r) => { s.killStack!.amount += 0.1 * r; s.range += 0.3 * r; },
@@ -279,8 +279,8 @@ export const CHAMPIONS: ChampionDef[] = [
   {
     id: 'veigar', name: 'Veigar', title: 'Le Petit Maître du mal', role: 'Mage', region: 'Bandle',
     color: '#6c5ce7', rarity: 3, reward: 'aram',
-    passive: 'Puissance phénoménale : +0,5 dégât par élimination (pendant la partie). x1,5 contre les boss.',
-    base: base({ dmg: 14, rate: 0.7, range: 3.2, killStack: { amount: 0.5, persistent: false }, bossMult: 1.5 }),
+    passive: 'Puissance phénoménale : +3 % de dégâts par élimination (pendant la partie). x1,5 contre les boss.',
+    base: base({ dmg: 18, rate: 0.8, range: 3.2, killStack: { amount: 0.03, persistent: false }, bossMult: 1.5 }),
     ult: {
       name: 'Big Bang', desc: 'Dégâts contre les boss renforcés.',
       apply: (s, r) => { s.bossMult! += 0.5 * r; },
@@ -294,7 +294,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'anivia', name: 'Anivia', title: 'Le Cryophénix', role: 'Mage', region: 'Freljord',
     color: '#9ad1f5', rarity: 3, reward: 'freljord',
     passive: 'Aura de givre : blesse et ralentit tout dans sa zone.',
-    base: base({ dmg: 6, rate: 1, range: 2.2, type: 'aura', slow: { pct: 0.3, dur: 0.6 } }),
+    base: base({ dmg: 10, rate: 1, range: 2.4, type: 'aura', slow: { pct: 0.3, dur: 0.6 } }),
     ult: {
       name: 'Tempête glaciale', desc: 'Aura plus large, plus froide, plus forte.',
       apply: (s, r) => { s.slow!.pct += 0.1 * r; s.dmg *= 1 + 0.4 * r; s.range += 0.3 * r; },
@@ -322,7 +322,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'garen', name: 'Garen', title: 'La Force de Demacia', role: 'Combattant', region: 'Demacia',
     color: '#4a7fd4', rarity: 3, reward: 'demacia',
     passive: 'Jugement : tournoie et frappe tous les ennemis autour de lui.',
-    base: base({ dmg: 12, rate: 1.2, range: 1.8, type: 'aura' }),
+    base: base({ dmg: 15, rate: 1.2, range: 2.1, type: 'aura' }),
     ult: {
       name: 'Justice de Demacia', desc: 'Dégâts accrus, bonus contre les boss.',
       apply: (s, r) => { s.dmg *= 1 + 0.2 * r; s.bossMult = 1 + 0.5 * r; },
@@ -336,7 +336,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'darius', name: 'Darius', title: 'La Main de Noxus', role: 'Combattant', region: 'Noxus',
     color: '#b3283a', rarity: 3, reward: 'noxus',
     passive: 'Hémorragie : fait saigner ses cibles pendant 5 s.',
-    base: base({ dmg: 16, rate: 0.8, range: 1.9, burn: { mult: 0.5, dur: 5 } }),
+    base: base({ dmg: 18, rate: 0.8, range: 2.4, burn: { mult: 0.6, dur: 5 } }),
     ult: {
       name: 'Guillotine noxienne', desc: 'Exécutions régulières aux dégâts massifs.',
       apply: (s, r) => { s.everyN = { n: Math.max(2, 5 - r), mult: 2 + r }; },
@@ -349,8 +349,8 @@ export const CHAMPIONS: ChampionDef[] = [
   {
     id: 'ahri', name: 'Ahri', title: 'Le Renard à neuf queues', role: 'Mage', region: 'Ionia',
     color: '#e86fb0', rarity: 3, reward: 'ionia',
-    passive: "Orbe d'illusion : rebondit sur 3 ennemis.",
-    base: base({ dmg: 14, rate: 0.8, range: 3.4, type: 'chain', targets: 3 }),
+    passive: "Orbe d'illusion : rebondit sur 3 ennemis. Charme : 10 % de chance d'étourdir.",
+    base: base({ dmg: 23, rate: 0.85, range: 3.4, type: 'chain', targets: 3, stun: { chance: 0.1, dur: 0.6 } }),
     ult: {
       name: 'Ruée spirituelle', desc: 'Plus de rebonds, attaque plus vite.',
       apply: (s, r) => { s.targets += r; s.rate *= 1 + 0.15 * r; },

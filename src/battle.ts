@@ -941,7 +941,8 @@ export class Battle {
         store.data.stacks[src.def.id] = (store.data.stacks[src.def.id] ?? 0) + ks.amount;
         src.stats.dmg += ks.amount;
       } else {
-        src.runStacks += ks.amount;
+        // Per-run stacks are a fraction of the champion's damage, so they keep their weight at high levels.
+        src.runStacks += ks.amount * src.stats.dmg;
       }
     }
   }
