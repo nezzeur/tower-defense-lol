@@ -29,4 +29,5 @@ Personal, local-only LoL-themed tower defense (PokéPath-like progression). Orig
 - Boss drops (`rewardChance`/`rollReward` in `game.ts`): 7 maps carry a champion; each final-boss win rolls a fixed `REWARD.base 5 % * 0.82^rank` (5 % Voie du Bas ... 1.5 % Ionia). No pity, by user choice.
 - Target priority per champion (`Tower.priority`, save `priorities`); enemy click shows an info card (`Battle.selectedEnemy`).
 - Sim with all this at growth 1.25: ashe 11h41, lux 9h46; the bot casts ults instantly, humans will be slower. `ULT=<x>` env scales/disables ults in the sim.
-- Ideas queued: manual ult aiming, auto-cast option, more regions, enemy traits (flying, resists).
+- Auto-cast option (`store.data.autoUlt`, `Battle.autoUlts`): casts ready ults when worthwhile (5+ enemies or an epic/boss).
+- Ideas queued: manual ult aiming, more regions, enemy traits (flying, resists).

@@ -26,7 +26,8 @@ export function startBattle(mapId: string): void {
       <div class="bstat lives">♥ <b id="b-lives">20</b></div>
       <div class="bstat gold">◆ <b id="b-gold">0</b></div>
       <div class="speed">${speeds.map((s) => `<button class="sp ${store.data.speed === s ? 'on' : ''}" data-speed="${s}">x${s}</button>`).join('')}</div>
-      <label class="auto"><input type="checkbox" id="b-auto" ${store.data.auto ? 'checked' : ''}> Auto</label>
+      <label class="auto" title="Lance et relance les vagues automatiquement"><input type="checkbox" id="b-auto" ${store.data.auto ? 'checked' : ''}> Vagues auto</label>
+      <label class="auto" title="Lance les ultimes tout seul quand ils sont prêts et utiles (groupe d'ennemis, boss)"><input type="checkbox" id="b-autoult" ${store.data.autoUlt ? 'checked' : ''}> Ultimes auto</label>
     </div>
     <div class="bmain">
       <aside class="hud-panel" id="wave-panel"></aside>

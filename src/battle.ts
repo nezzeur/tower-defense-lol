@@ -143,6 +143,7 @@ export class Battle {
   private lastFrame = 0;
   private acc = 0;
   private saveT = 0;
+  private autoUltT = 0;
 
   wave = 0;
   /** Run statistics shown in the HUD. */
@@ -644,6 +645,23 @@ export class Battle {
     return true;
   }
 
+  /** Auto-cast (option): fires ready ultimates only when they have something worthwhile to hit. */
+  private autoUlts(): void {
+    const alive = this.enemies.filter((e) => !e.dead);
+    const big = alive.some((e) => e.def.boss || e.def.shape === 'boss');
+    for (const t of this.towers) {
+      if (t.ultCd > 0) continue;
+      const k = t.def.active.fx.kind;
+      const worth = k === 'gold' ? true
+        : k === 'lives' ? this.lives <= MAX_LIVES - 3
+        // Executes wait for the epic monster or boss on the waves that have one.
+        : k === 'execute' ? big || (alive.length > 0 && this.wave % 10 !== 0 && this.wave !== this.map.waves)
+        : k === 'buff' ? this.inRange(t).length >= 2 || (big && this.inRange(t).length > 0)
+        : big || alive.length >= 5;
+      if (worth) this.castUlt(t);
+    }
+  }
+
   private sortTargets(list: Enemy[], t: Tower): Enemy[] {
     // Distance left to the nexus: lanes differ in length, so raw progress is not comparable.
     const left = (e: Enemy) => this.lanes[e.lane].len - e.s;
@@ -688,6 +706,7 @@ export class Battle {
     for (const k of Object.keys(this.spellCd) as SpellId[]) this.spellCd[k] = Math.max(0, this.spellCd[k] - dt);
     const charge = dt * (1 + (this.syn.ultCd ?? 0));
     for (const t of this.towers) t.ultCd = Math.max(0, t.ultCd - charge);
+    if (store.data.autoUlt && this.waveActive && !this.over && (this.autoUltT -= dt) <= 0) { this.autoUltT = 0.5; this.autoUlts(); }
     this.saveT += dt;
     if (this.saveT > 10) { this.saveT = 0; persist(); }
 
