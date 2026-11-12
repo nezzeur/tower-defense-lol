@@ -49,8 +49,12 @@ export function startBattle(mapId: string): void {
         <div class="team" id="team"></div>
       </div>
       <div class="go">
-        <button class="btn boss hidden" id="b-endless" data-endless title="Après la vague ${map.waves} : les vagues continuent sans fin, de plus en plus dures, avec le boss toutes les 10 vagues">Mode infini ∞</button>
-        <button class="btn boss hidden" id="b-boss" data-boss title="Commence directement à la vague ${map.waves}">Défier le boss ⚔</button>
+        <div class="modes hidden" id="b-modes">
+          <span class="small muted">Mode</span>
+          <button class="chip" data-mode="normal" title="Les ${map.waves} vagues de la carte">Normal</button>
+          <button class="chip" data-mode="boss" title="Commence directement à la vague ${map.waves}">Boss ⚔</button>
+          <button class="chip" data-mode="endless" title="Après la vague ${map.waves} : les vagues continuent sans fin, de plus en plus dures, avec le boss toutes les 10 vagues">Infini ∞</button>
+        </div>
         <button class="btn start" id="b-start" data-startwave>Lancer la vague ▶</button>
       </div>
     </div>
@@ -340,9 +344,17 @@ export function refreshLive(): void {
   const start = document.getElementById('b-start') as HTMLButtonElement;
   start.disabled = b.waveActive || b.over;
   const shown = (w: number) => (b.endless ? `∞ ${Math.max(1, w - b.map.waves)}` : String(w));
-  start.textContent = b.waveActive ? `Vague ${shown(b.wave)} en cours…` : `Lancer la vague ${shown(b.wave + 1)} ▶`;
-  document.getElementById('b-endless')!.classList.toggle('hidden', b.wave !== 0 || b.waveActive || b.over || !endlessUnlocked(b.map.id));
-  document.getElementById('b-boss')!.classList.toggle('hidden', b.wave !== 0 || b.waveActive || b.over || !b.canChallengeBoss());
+  const first = b.wave === 0 && !b.waveActive;
+  start.textContent = b.waveActive ? `Vague ${shown(b.wave)} en cours…`
+    : first && b.endless ? 'Lancer le mode infini ▶' : first && b.bossMode ? `Défier le boss (vague ${b.map.waves}) ▶` : `Lancer la vague ${shown(b.wave + 1)} ▶`;
+  // Mode selector: only before the first wave, only the modes this map has opened
+  const canBoss = b.canChallengeBoss(), canEndless = endlessUnlocked(b.map.id);
+  document.getElementById('b-modes')!.classList.toggle('hidden', !first || b.over || (!canBoss && !canEndless));
+  document.querySelectorAll<HTMLButtonElement>('#b-modes [data-mode]').forEach((el) => {
+    const m = el.dataset.mode!;
+    el.classList.toggle('on', m === b.mode());
+    el.classList.toggle('hidden', (m === 'boss' && !canBoss) || (m === 'endless' && !canEndless));
+  });
   set('b-hint', !b.towers.length ? 'Place au moins un champion avant de lancer la vague.'
     : store.data.auto ? 'Mode auto : vagues et redémarrages automatiques.' : '');
 }
@@ -373,9 +385,9 @@ function showResult(win: boolean, wave: number): void {
     <p class="small muted">Ton or, tes niveaux et tes objets sont conservés.</p>
     ${reward}
     ${lootRow(ui.battle.runLoot) ? `<div class="small muted">Butin de la partie</div><div class="result-loot">${lootRow(ui.battle.runLoot)}</div>` : ''}
-    <div class="row"><button class="btn gold" data-restart>Rejouer</button>
-      ${endlessUnlocked(ui.battle.map.id) ? '<button class="btn boss" data-endless>Mode infini ∞</button>' : ''}
-      ${ui.battle.canChallengeBoss() ? '<button class="btn boss" data-boss>Retenter le boss ⚔</button>' : ''}
+    <div class="row"><button class="btn gold" data-mode="normal">Rejouer</button>
+      ${endlessUnlocked(ui.battle.map.id) ? '<button class="btn boss" data-mode="endless">Mode infini ∞</button>' : ''}
+      ${ui.battle.canChallengeBoss() ? '<button class="btn boss" data-mode="boss">Boss ⚔</button>' : ''}
       <button class="btn" data-leave>Changer de carte</button></div>
     ${store.data.auto ? '<p class="small muted">Mode auto : redémarrage automatique…</p>' : ''}
   </div>`;

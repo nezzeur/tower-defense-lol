@@ -115,16 +115,8 @@ app.addEventListener('click', (e) => {
   if (d.leave !== undefined) return leaveBattle();
   if (d.startwave !== undefined) { if (b.towers.length) b.startWave(); return; }
   if (d.restart !== undefined) return b.restart();
-  if (d.endless !== undefined) {
-    if (!b.towers.length) return flash('Place au moins un champion avant de lancer le mode infini.');
-    b.restart(false, true);
-    return b.startWave();
-  }
-  if (d.boss !== undefined) {
-    if (!b.towers.length) return flash('Place au moins un champion avant de défier le boss.');
-    b.restart(true);
-    return b.startWave();
-  }
+  // Choosing a mode never launches anything: the player starts the wave when ready
+  if (d.mode) { b.setMode(d.mode as 'normal' | 'boss' | 'endless'); return renderSide(); }
   if (d.speed) {
     store.data.speed = Number(d.speed);
     persist();

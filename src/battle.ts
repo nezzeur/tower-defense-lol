@@ -592,6 +592,18 @@ export class Battle {
     this.hitStop = Math.max(this.hitStop, sec);
   }
 
+  /** Picks the mode of the next run without launching it (resets the board if a run is under way or over). */
+  setMode(mode: 'normal' | 'boss' | 'endless'): void {
+    if (this.wave > 0 || this.over || this.waveActive) { this.restart(mode === 'boss', mode === 'endless'); return; }
+    this.endless = mode === 'endless' && endlessUnlocked(this.map.id);
+    this.bossMode = mode === 'boss' && this.canChallengeBoss();
+    this.ev.onChange();
+  }
+
+  mode(): 'normal' | 'boss' | 'endless' {
+    return this.endless ? 'endless' : this.bossMode ? 'boss' : 'normal';
+  }
+
   restart(bossMode = false, endless = false): void {
     this.endless = endless && endlessUnlocked(this.map.id);
     this.bossMode = !this.endless && bossMode && this.canChallengeBoss();

@@ -174,3 +174,5 @@
 .nw { position: relative; }
 .nw-traits { position: absolute; left: 0; right: 0; bottom: -13px; text-align: center; font-style: normal; font-size: 10px; line-height: 1; white-space: nowrap; }
 .next-wave { row-gap: 16px; padding-bottom: 12px; }
+
+.modes { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; justify-content: flex-end; }
