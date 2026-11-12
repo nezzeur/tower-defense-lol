@@ -25,6 +25,8 @@ export const BALANCE = {
   goldMultExp: 0.95,
   /** Kill gold growth per wave (linear). */
   goldPerWave: 0.03,
+  /** Endless mode: extra enemy HP growth per wave beyond the map's last one (compounding). */
+  endlessGrowth: 1.07,
   chestBase: 120,
   chestGrowth: 1.45,
 };
@@ -77,7 +79,8 @@ export const isArena = (m: MapDef): boolean => {
   return i === MAPS.length - 1 || MAPS[i + 1].region !== m.region;
 };
 
-export const hpScale = (m: MapDef, w: number): number => m.mult * (1 + 0.1 * (w - 1)) * BALANCE.hpPerWave ** (w - 1);
+export const hpScale = (m: MapDef, w: number): number =>
+  m.mult * (1 + 0.1 * (w - 1)) * BALANCE.hpPerWave ** (w - 1) * (w > m.waves ? BALANCE.endlessGrowth ** (w - m.waves) : 1);
 export const goldScale = (m: MapDef, w: number): number => (1 + BALANCE.goldPerWave * w) * m.mult ** BALANCE.goldMultExp;
 export const waveBonus = (m: MapDef, w: number): number => Math.round((10 + 3 * w) * m.mult ** BALANCE.goldMultExp);
 
@@ -105,9 +108,11 @@ export const REGION_ROSTER: Record<string, Roster> = {
 export function buildWave(m: MapDef, w: number): Spawn[] {
   const out: Spawn[] = [];
   const ro = REGION_ROSTER[m.region ?? 'rift'] ?? RIFT_ROSTER;
-  if (w === m.waves) {
+  // The final boss closes the map, and comes back every 10 waves of endless mode with a bigger escort
+  if (w === m.waves || (w > m.waves && (w - m.waves) % 10 === 0)) {
     out.push({ id: m.finalBoss, delay: 0 });
-    for (let i = 0; i < 10; i++) out.push({ id: ro.elite, delay: 0.8 });
+    const escort = 10 + Math.max(0, Math.floor((w - m.waves) / 10)) * 4;
+    for (let i = 0; i < escort; i++) out.push({ id: ro.elite, delay: 0.8 });
     return out;
   }
   const n = 6 + Math.floor(w * 0.5);
@@ -236,3 +241,9 @@ export function craftItem(itemId: string): boolean {
   store.data.items.push(itemId);
   return true;
 }
+
+/** Endless mode opens on a map once its last wave has been beaten. */
+export const endlessUnlocked = (mapId: string): boolean => {
+  const m = MAPS.find((x) => x.id === mapId);
+  return !!m && (store.data.best[mapId] ?? 0) >= m.waves;
+};

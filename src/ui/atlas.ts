@@ -36,7 +36,7 @@ function mapCard(id: string, cur: string): string {
       <div class="level-title"><b>${esc(m.name)}</b>${done ? '<span class="done">✔</span>' : ''}</div>
       <div class="muted small">${esc(m.subtitle)}</div>
       <div class="feat-icons">${(m.lanes?.length ? '<span title="Plusieurs voies">⇉</span>' : '') + [...new Set((m.features ?? []).map((f) => f.kind))].map((k) => `<span title="${esc(FEATURE_INFO[k].name)}">${FEATURE_INFO[k].icon}</span>`).join('')}</div>
-      ${open ? `${starRow(stars(m.id))}<div class="small">Record <b>${best}</b>/${m.waves} · Boss : ${esc(enemyName(m.finalBoss))}</div>`
+      ${open ? `${starRow(stars(m.id))}<div class="small">Record <b>${best}</b>/${m.waves} · Boss : ${esc(enemyName(m.finalBoss))}</div>${done ? `<div class="small endless-rec">∞ Mode infini · record <b>${store.data.endless[m.id] ?? 0}</b></div>` : ''}`
         : `<div class="lock small">🔒 ${esc(unlockReason(m) ?? '')}</div>`}
       <div class="level-foot">
         ${rw ? `<span class="reward-chip" title="Chance que le boss final lâche ce champion à chaque victoire.">${portrait(rw, 22, !store.data.owned.includes(rw.id))}${store.data.owned.includes(rw.id) ? esc(rw.name) : `Butin du boss · ${pct(rewardChance(m.id))}`}</span>` : '<span></span>'}

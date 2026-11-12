@@ -18,6 +18,8 @@ export interface SaveData {
   equip: Record<string, string>;
   /** Highest wave cleared per map. */
   best: Record<string, number>;
+  /** Endless mode: most waves survived beyond the map's last one, per map. */
+  endless: Record<string, number>;
   layouts: Record<string, Placement[]>;
   chestsOpened: number;
   /** Pending chest choice (champion ids); kept in the save so a reload can't reroll it. */
@@ -46,7 +48,7 @@ const KEY = 'riftdefenders.save.v1' + (slot ? `:${slot}` : '');
 
 function fresh(): SaveData {
   return {
-    v: 1, gold: 0, owned: [], levels: {}, stacks: {}, items: [], mats: {}, equip: {}, best: {}, layouts: {}, priorities: {},
+    v: 1, gold: 0, owned: [], levels: {}, stacks: {}, items: [], mats: {}, equip: {}, best: {}, endless: {}, layouts: {}, priorities: {},
     chestsOpened: 0, chestOffer: null, chestsSinceEpic: 0, speed: 1, auto: false, autoUlt: false, lowFx: false, kills: 0, runs: 0, volume: 0.5, muted: false, music: 0.35,
   };
 }
@@ -66,6 +68,7 @@ function sanitize(raw: unknown): SaveData {
   if (d.v !== 1 || !Array.isArray(d.owned) || typeof d.gold !== 'number') throw new Error('bad save');
   if (typeof d.volume !== 'number' || !(d.volume >= 0 && d.volume <= 1)) d.volume = 0.5;
   d.muted = d.muted === true;
+  if (!d.endless || typeof d.endless !== 'object' || Array.isArray(d.endless)) d.endless = {};
   if (typeof d.music !== 'number' || !(d.music >= 0 && d.music <= 1)) d.music = 0.35;
   if (!d.mats || typeof d.mats !== 'object' || Array.isArray(d.mats)) d.mats = {};
   d.autoUlt = d.autoUlt === true;

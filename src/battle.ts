@@ -14,7 +14,7 @@ import { MAT_BY_ID, rollLoot } from './data/loot';
 import { teamSynergies, type SynStat } from './data/synergies';
 import { COLS, ROWS } from './data/maps';
 import {
-  buildWave, champ, computeStats, goldScale, hpScale, level, MAX_LIVES, START_LIVES, teamSlots, ultRank, waveBonus,
+  buildWave, champ, computeStats, endlessUnlocked, goldScale, hpScale, level, MAX_LIVES, START_LIVES, teamSlots, ultRank, waveBonus,
   type Spawn,
 } from './game';
 import { persist, store } from './save';
@@ -530,7 +530,7 @@ export class Battle {
 
   /** Composition of the next wave (enemy id -> count). */
   nextWave(): { id: string; n: number }[] {
-    if (this.wave >= this.map.waves) return [];
+    if (this.wave >= this.map.waves && !this.endless) return [];
     const counts = new Map<string, number>();
     for (const sp of buildWave(this.map, this.wave + 1)) counts.set(sp.id, (counts.get(sp.id) ?? 0) + 1);
     return [...counts].map(([id, n]) => ({ id, n }));
@@ -538,6 +538,13 @@ export class Battle {
 
   /** Boss challenge: the run starts directly at the final wave. */
   bossMode = false;
+  /** Endless mode: the run starts after the map's last wave and only ends when the nexus falls. */
+  endless = false;
+
+  /** Waves survived in the current endless run. */
+  endlessWave(): number {
+    return Math.max(0, this.wave - this.map.waves);
+  }
 
   canChallengeBoss(): boolean {
     return (store.data.best[this.map.id] ?? 0) >= this.map.waves - 1;
@@ -546,6 +553,7 @@ export class Battle {
   startWave(): void {
     if (this.waveActive || this.over) return;
     if (this.bossMode && this.wave === 0) this.wave = this.map.waves - 1;
+    if (this.endless && this.wave === 0) this.wave = this.map.waves;
     this.wave++;
     this.queue = buildWave(this.map, this.wave);
     this.waveTotal = this.queue.length;
@@ -553,8 +561,8 @@ export class Battle {
     this.waveActive = true;
     this.autoT = -1;
     if (this.visual) sfx('wave');
-    const final = this.wave === this.map.waves;
-    this.showBanner(final ? 'BOSS' : `Vague ${this.wave}`, final ? ENEMIES[this.map.finalBoss].name
+    const final = this.wave === this.map.waves || (this.endless && this.endlessWave() % 10 === 0);
+    this.showBanner(final ? 'BOSS' : this.endless ? `Infini · vague ${this.endlessWave()}` : `Vague ${this.wave}`, final ? ENEMIES[this.map.finalBoss].name
       : this.wave % 10 === 0 ? 'Monstre épique en approche' : this.wave % 5 === 0 ? 'Carapateurs !' : '', final ? '#c084fc' : '#f0e6d2');
     this.ev.onChange();
   }
@@ -584,8 +592,9 @@ export class Battle {
     this.hitStop = Math.max(this.hitStop, sec);
   }
 
-  restart(bossMode = false): void {
-    this.bossMode = bossMode && this.canChallengeBoss();
+  restart(bossMode = false, endless = false): void {
+    this.endless = endless && endlessUnlocked(this.map.id);
+    this.bossMode = !this.endless && bossMode && this.canChallengeBoss();
     this.enemies = [];
     this.projs = [];
     this.fx = [];
@@ -793,7 +802,7 @@ export class Battle {
       const worth = k === 'gold' ? true
         : k === 'lives' ? this.lives <= MAX_LIVES - 3
         // Executes wait for the epic monster or boss on the waves that have one.
-        : k === 'execute' ? big || (alive.length > 0 && this.wave % 10 !== 0 && this.wave !== this.map.waves)
+        : k === 'execute' ? big || (alive.length > 0 && this.wave % 10 !== 0 && this.wave !== this.map.waves && !(this.endless && this.endlessWave() % 10 === 0))
         : k === 'buff' ? this.inRange(t).length >= 2 || (big && this.inRange(t).length > 0)
         : big || alive.length >= 5;
       if (worth) this.castUlt(t);
@@ -859,7 +868,7 @@ export class Battle {
     if (this.autoT >= 0) {
       this.autoT -= dt;
       if (this.autoT < 0) {
-        if (this.over) this.restart();
+        if (this.over) this.restart(false, this.endless);
         else this.startWave();
       }
     }
@@ -1270,12 +1279,16 @@ export class Battle {
     const bonus = waveBonus(this.map, this.wave);
     d.gold += bonus;
     this.runGold += bonus;
-    if (this.wave < this.map.waves) this.showBanner(`Vague ${this.wave} repoussée`, `+${fmtShort(bonus)} or`, '#f5c542');
-    d.best[this.map.id] = Math.max(d.best[this.map.id] ?? 0, this.wave);
+    if (this.wave !== this.map.waves) this.showBanner(this.endless ? `Infini · vague ${this.endlessWave()} repoussée` : `Vague ${this.wave} repoussée`, `+${fmtShort(bonus)} or`, '#f5c542');
+    d.best[this.map.id] = Math.max(d.best[this.map.id] ?? 0, Math.min(this.wave, this.map.waves));
+    if (this.endless) d.endless[this.map.id] = Math.max(d.endless[this.map.id] ?? 0, this.endlessWave());
     const heal = this.towers.reduce((n, t) => n + (t.stats.livesPerWave ?? 0), 0);
     this.lives = Math.min(MAX_LIVES, this.lives + heal);
     persist();
-    if (this.wave >= this.map.waves) {
+    if (this.endless) {
+      // Endless: no victory, the next wave is always coming
+      if (d.auto) this.autoT = 1;
+    } else if (this.wave >= this.map.waves) {
       this.over = true;
       if (this.visual) sfx('victory');
       this.ev.onEnd(true, this.wave);

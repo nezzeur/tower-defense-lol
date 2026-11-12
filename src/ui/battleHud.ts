@@ -9,7 +9,7 @@ import { lootRolls, lootTable, MAT_BY_ID, MATERIALS } from '../data/loot';
 import { matChip } from './inventory';
 import { MAP_BY_ID } from '../data/maps';
 import { REGIONS } from '../art/worldArt';
-import { champ, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots } from '../game';
+import { champ, endlessUnlocked, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots } from '../game';
 import { sfx } from '../audio';
 import { setMusic, setMusicIntensity } from '../music';
 import { persist, store } from '../save';
@@ -25,7 +25,7 @@ export function startBattle(mapId: string): void {
     <div class="bbar">
       <button class="btn" data-leave>← Cartes</button>
       <div class="bmap">${esc(map.name)}<small>${esc(REGIONS.find((r) => r.maps.includes(map.id))?.name ?? '')}</small></div>
-      <div class="bstat">Vague <b id="b-wave">0</b>/${map.waves}</div>
+      <div class="bstat">Vague <b id="b-wave">0</b><span id="b-wave-max">/${map.waves}</span></div>
       <div class="bstat lives">♥ <b id="b-lives">20</b></div>
       <div class="bstat gold">◆ <b id="b-gold">0</b></div>
       <div class="speed">${speeds.map((s) => `<button class="sp ${store.data.speed === s ? 'on' : ''}" data-speed="${s}">x${s}</button>`).join('')}</div>
@@ -49,6 +49,7 @@ export function startBattle(mapId: string): void {
         <div class="team" id="team"></div>
       </div>
       <div class="go">
+        <button class="btn boss hidden" id="b-endless" data-endless title="Après la vague ${map.waves} : les vagues continuent sans fin, de plus en plus dures, avec le boss toutes les 10 vagues">Mode infini ∞</button>
         <button class="btn boss hidden" id="b-boss" data-boss title="Commence directement à la vague ${map.waves}">Défier le boss ⚔</button>
         <button class="btn start" id="b-start" data-startwave>Lancer la vague ▶</button>
       </div>
@@ -155,6 +156,7 @@ function mapInfoPanel(b: Battle): string {
       <div class="mi-thumb">${mapThumb(m.id)}</div>
       <div class="mi-row"><b>${esc(m.name)}</b>${starRow(stars(m.id))}</div>
       <div class="small muted">${esc(m.subtitle)} · record vague ${best}/${m.waves}</div>
+      ${endlessUnlocked(m.id) ? `<div class="small">∞ Mode infini · record <b>${store.data.endless[m.id] ?? 0}</b> vague(s)</div>` : `<div class="small muted">∞ Mode infini : termine la carte pour l'ouvrir</div>`}
     </div>
     <div class="hud-card">
       <div class="hud-title">Boss final</div>
@@ -188,7 +190,8 @@ function fmtTime(sec: number): string {
 function wavePanel(b: Battle): string {
   const m = b.map;
   const remaining = b.waveRemaining();
-  const nextBoss = b.wave >= m.waves ? 0 : (Math.floor(b.wave / 10) + 1) * 10;
+  const ew = b.endlessWave();
+  const nextBoss = b.endless ? m.waves + (Math.floor(ew / 10) + 1) * 10 : b.wave >= m.waves ? 0 : (Math.floor(b.wave / 10) + 1) * 10;
   const bossIn = nextBoss - b.wave;
   const next = b.nextWave();
   const total = Math.max(1, b.towers.reduce((n, t) => n + t.dmgDone, 0));
@@ -197,11 +200,14 @@ function wavePanel(b: Battle): string {
       <span>${esc(t.def.name)}</span><b>${fmt(t.dmgDone)}</b></div></div>`).join('');
   return `<div class="hud-card wave-card">
       <div class="hud-title">Vague</div>
-      <div class="wave-big"><b>${b.wave}</b><span>/ ${m.waves}</span></div>
-      <div class="bar"><div style="width:${(b.wave / m.waves) * 100}%"></div></div>
+      ${b.endless
+        ? `<div class="wave-big"><b>∞ ${ew}</b><span>record ${store.data.endless[m.id] ?? 0}</span></div>
+           <div class="bar"><div style="width:${((ew % 10) / 10) * 100}%"></div></div>`
+        : `<div class="wave-big"><b>${b.wave}</b><span>/ ${m.waves}</span></div>
+           <div class="bar"><div style="width:${(b.wave / m.waves) * 100}%"></div></div>`}
       ${b.waveActive ? `<div class="small">Ennemis restants <b>${remaining}</b> / ${b.waveTotal}</div>
         <div class="bar red"><div style="width:${(remaining / Math.max(1, b.waveTotal)) * 100}%"></div></div>` : '<div class="small muted">En attente du lancement</div>'}
-      ${bossIn > 0 ? `<div class="boss-in">${nextBoss === m.waves ? 'Boss final' : 'Monstre épique'} dans <b>${bossIn}</b> vague${bossIn > 1 ? 's' : ''}</div>` : ''}
+      ${bossIn > 0 ? `<div class="boss-in">${nextBoss === m.waves ? 'Boss final' : b.endless ? 'Retour du boss' : 'Monstre épique'} dans <b>${bossIn}</b> vague${bossIn > 1 ? 's' : ''}</div>` : ''}
     </div>
     <div class="hud-card">
       <div class="hud-title">Prochaine vague</div>
@@ -322,8 +328,9 @@ export function refreshLive(): void {
   if (!!card !== !!b.selectedEnemy) return renderSide();
   if (card && b.selectedEnemy) setHtml(card, enemyCard(b, b.selectedEnemy));
   // Music follows the fight: calm between waves, driving during one, heavier on epic and boss waves
-  setMusicIntensity(!b.waveActive || b.over ? 0 : b.wave === b.map.waves || b.wave % 10 === 0 ? 2 : 1);
-  set('b-wave', String(b.wave));
+  setMusicIntensity(!b.waveActive || b.over ? 0 : b.wave === b.map.waves || b.wave % 10 === 0 || b.endless ? 2 : 1);
+  set('b-wave', b.endless ? `∞ ${b.endlessWave()}` : String(b.wave));
+  set('b-wave-max', b.endless ? '' : `/${b.map.waves}`);
   set('b-lives', String(Math.max(0, b.lives)));
   for (const id of Object.keys(SPELLS) as SpellId[]) {
     const cd = b.spellCd[id];
@@ -332,7 +339,9 @@ export function refreshLive(): void {
   }
   const start = document.getElementById('b-start') as HTMLButtonElement;
   start.disabled = b.waveActive || b.over;
-  start.textContent = b.waveActive ? `Vague ${b.wave} en cours…` : `Lancer la vague ${b.wave + 1} ▶`;
+  const shown = (w: number) => (b.endless ? `∞ ${Math.max(1, w - b.map.waves)}` : String(w));
+  start.textContent = b.waveActive ? `Vague ${shown(b.wave)} en cours…` : `Lancer la vague ${shown(b.wave + 1)} ▶`;
+  document.getElementById('b-endless')!.classList.toggle('hidden', b.wave !== 0 || b.waveActive || b.over || !endlessUnlocked(b.map.id));
   document.getElementById('b-boss')!.classList.toggle('hidden', b.wave !== 0 || b.waveActive || b.over || !b.canChallengeBoss());
   set('b-hint', !b.towers.length ? 'Place au moins un champion avant de lancer la vague.'
     : store.data.auto ? 'Mode auto : vagues et redémarrages automatiques.' : '');
@@ -357,11 +366,15 @@ function showResult(win: boolean, wave: number): void {
   }
   ov.innerHTML = `<div class="result ${win ? 'win' : 'lose'}">
     <h2>${win ? 'Victoire !' : 'Nexus détruit'}</h2>
-    <p>${win ? `${esc(ui.battle.map.name)} terminée !` : `Tu as tenu jusqu'à la vague ${wave}.`}</p>
+    <p>${win ? `${esc(ui.battle.map.name)} terminée !` : ui.battle.endless
+      ? `Mode infini : <b>${Math.max(0, ui.battle.endlessWave() - 1)}</b> vague(s) repoussée(s) · record <b>${store.data.endless[ui.battle.map.id] ?? 0}</b>`
+      : `Tu as tenu jusqu'à la vague ${wave}.`}</p>
+    ${win && endlessUnlocked(ui.battle.map.id) ? '<p class="small">Le mode infini de cette carte est ouvert.</p>' : ''}
     <p class="small muted">Ton or, tes niveaux et tes objets sont conservés.</p>
     ${reward}
     ${lootRow(ui.battle.runLoot) ? `<div class="small muted">Butin de la partie</div><div class="result-loot">${lootRow(ui.battle.runLoot)}</div>` : ''}
     <div class="row"><button class="btn gold" data-restart>Rejouer</button>
+      ${endlessUnlocked(ui.battle.map.id) ? '<button class="btn boss" data-endless>Mode infini ∞</button>' : ''}
       ${ui.battle.canChallengeBoss() ? '<button class="btn boss" data-boss>Retenter le boss ⚔</button>' : ''}
       <button class="btn" data-leave>Changer de carte</button></div>
     ${store.data.auto ? '<p class="small muted">Mode auto : redémarrage automatique…</p>' : ''}
