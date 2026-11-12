@@ -165,3 +165,12 @@
 .st-stun { color: var(--star); border-color: var(--gold3); }
 .st-burn { color: var(--red); border-color: var(--red); }
 .syn-info { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; padding: 6px 10px; background: var(--bg2); border: 1px solid var(--gold5); border-left: 3px solid var(--teal1); }
+
+/* Enemy traits */
+.trait { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; padding: 5px 7px; background: var(--bg2); border: 1px solid var(--gold5); border-left: 3px solid var(--teal1); }
+.trait > span { font-size: 16px; line-height: 1.2; }
+.trait div { display: flex; flex-direction: column; }
+.trait b { font: 700 12px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; }
+.nw { position: relative; }
+.nw-traits { position: absolute; left: 0; right: 0; bottom: -13px; text-align: center; font-style: normal; font-size: 10px; line-height: 1; white-space: nowrap; }
+.next-wave { row-gap: 16px; padding-bottom: 12px; }

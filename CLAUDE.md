@@ -29,7 +29,8 @@ Personal, local-only LoL-themed tower defense (PokéPath-like progression). Orig
 - Boss drops (`rewardChance`/`rollReward` in `game.ts`): 7 maps carry a champion; each final-boss win rolls a fixed `REWARD.base 5 % * 0.82^rank` (5 % Voie du Bas ... 1.5 % Ionia). No pity, by user choice.
 - Loot (`src/data/loot.ts`): monsters drop materials into `store.data.mats`; fixed chance per roll by rarity (`DROP_CHANCE` 5 / 1.5 / 0.4 / 0.2 %), `lootRolls` gives tough monsters more rolls (epic 25, boss 50). 6 universal materials by monster family + 3 per region (any monster on that region's maps).
 - Items (`src/data/items.ts`): 20 shop items (`SHOP_ITEMS`, priced 400 → 3M to span the whole campaign; bot now ~12h40-14h) + 11 forged (`FORGE_ITEMS`, `craft` recipe, 2 per region + 1 legendary); `canCraft`/`craftItem` in `game.ts`. Pages `src/ui/inventory.ts` (Inventaire, Forge), styles `src/styles/inventory.css`.
+- Regional enemies: 17 troops in `data/enemies.ts` (`dem_*`, `frl_*`, `nox_*`, `ion_*`), swapped into wave slots by `REGION_ROSTER` in `game.ts`; art built from templates in `art/mobRegion.ts`. Traits on `EnemyDef` (fly, tenacity, regen, heal, shield, split, fireproof) handled in `battle.ts`, described by `enemyTraits`. Sim after this: 11h38-14h.
 - Target priority per champion (`Tower.priority`, save `priorities`); enemy click shows an info card (`Battle.selectedEnemy`).
 - Sim with all this at growth 1.25: ashe 11h41, lux 9h46; the bot casts ults instantly, humans will be slower. `ULT=<x>` env scales/disables ults in the sim.
 - Auto-cast option (`store.data.autoUlt`, `Battle.autoUlts`): casts ready ults when worthwhile (5+ enemies or an epic/boss).
-- Ideas queued: manual ult aiming, more regions, enemy traits (flying, resists).
+- Ideas queued: manual ult aiming, more regions, region-specific epic monsters, music.

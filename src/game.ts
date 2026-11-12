@@ -83,26 +83,46 @@ export const waveBonus = (m: MapDef, w: number): number => Math.round((10 + 3 * 
 
 export interface Spawn { id: string; delay: number }
 
+/** Who fills each slot of a wave. Regions swap in their own troops (data/enemies.ts). */
+interface Roster {
+  basic: string; ranged: string; tank: string; elite: string;
+  /** Small groups joining on a rotation: pack x3, swarm x6, heavy x2, brute x1, runner x6. */
+  pack: string; swarm: string; heavy: string; brute: string; runner: string;
+  /** Region specialists (healers...): two of them every 4 waves from wave 5. */
+  support?: string;
+}
+const RIFT_ROSTER: Roster = { basic: 'melee', ranged: 'caster', tank: 'cannon', elite: 'super', pack: 'wolf', swarm: 'raptor', heavy: 'krug', brute: 'gromp', runner: 'scuttle' };
+export const REGION_ROSTER: Record<string, Roster> = {
+  rift: RIFT_ROSTER,
+  demacia: { ...RIFT_ROSTER, basic: 'dem_soldier', tank: 'dem_knight', pack: 'dem_hunter', swarm: 'dem_wing' },
+  freljord: { ...RIFT_ROSTER, basic: 'frl_raider', pack: 'frl_wolf', heavy: 'frl_troll', support: 'frl_witch' },
+  noxus: { ...RIFT_ROSTER, basic: 'nox_legion', pack: 'nox_hound', heavy: 'nox_basilisk', support: 'nox_mage' },
+  ionia: { ...RIFT_ROSTER, basic: 'ion_acolyte', pack: 'ion_ninja', swarm: 'ion_wisp', heavy: 'ion_oni', runner: 'ion_crane' },
+};
+
 export function buildWave(m: MapDef, w: number): Spawn[] {
   const out: Spawn[] = [];
+  const ro = REGION_ROSTER[m.region ?? 'rift'] ?? RIFT_ROSTER;
   if (w === m.waves) {
     out.push({ id: m.finalBoss, delay: 0 });
-    for (let i = 0; i < 10; i++) out.push({ id: 'super', delay: 0.8 });
+    for (let i = 0; i < 10; i++) out.push({ id: ro.elite, delay: 0.8 });
     return out;
   }
   const n = 6 + Math.floor(w * 0.5);
   for (let i = 0; i < n; i++) {
-    let id = i % 3 === 2 ? 'caster' : 'melee';
-    if (w >= 4 && i % 7 === 6) id = 'cannon';
-    if (w >= 25 && i % 9 === 8) id = 'super';
+    let id = i % 3 === 2 ? ro.ranged : ro.basic;
+    if (w >= 4 && i % 7 === 6) id = ro.tank;
+    if (w >= 25 && i % 9 === 8) id = ro.elite;
     out.push({ id, delay: i === 0 ? 0 : 0.7 });
   }
-  // Jungle camps join the minions on a rotation
-  if (w % 3 === 0) for (let i = 0; i < 3; i++) out.push({ id: 'wolf', delay: i ? 0.4 : 1 });
-  if (w % 4 === 2) for (let i = 0; i < 6; i++) out.push({ id: 'raptor', delay: i ? 0.25 : 1 });
-  if (w >= 6 && w % 6 === 0) for (let i = 0; i < 2; i++) out.push({ id: 'krug', delay: i ? 0.8 : 1.2 });
-  if (w >= 7 && w % 7 === 0) out.push({ id: 'gromp', delay: 1.2 });
-  if (w % 5 === 0 && w % 10 !== 0) for (let i = 0; i < 6; i++) out.push({ id: 'scuttle', delay: 0.3 });
+  // Region specialists slip in behind the front line
+  if (ro.support && w >= 5 && w % 4 === 1) for (let i = 0; i < 2; i++) out.push({ id: ro.support, delay: i ? 0.9 : 0.6 });
+  // Jungle camps and regional beasts join on a rotation
+  if (w % 3 === 0) for (let i = 0; i < 3; i++) out.push({ id: ro.pack, delay: i ? 0.4 : 1 });
+  if (w % 4 === 2) for (let i = 0; i < 6; i++) out.push({ id: ro.swarm, delay: i ? 0.25 : 1 });
+  if (w >= 6 && w % 6 === 0) for (let i = 0; i < 2; i++) out.push({ id: ro.heavy, delay: i ? 0.8 : 1.2 });
+  if (w >= 7 && w % 7 === 0) out.push({ id: ro.brute, delay: 1.2 });
+  if (w % 5 === 0 && w % 10 !== 0) for (let i = 0; i < 6; i++) out.push({ id: ro.runner, delay: 0.3 });
   if (w % 10 === 0) out.push({ id: w % 20 === 0 ? 'herald' : 'drake', delay: 1.2 });
   return out;
 }

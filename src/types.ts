@@ -93,6 +93,21 @@ export interface EnemyDef {
   color: string;
   boss?: boolean;
   shape: 'circle' | 'square' | 'diamond' | 'boss';
+  // --- Traits ---
+  /** Flying: halves damage from area attacks (splash, aura) and ignores rivers. */
+  fly?: boolean;
+  /** 0..1 resistance to slows and stuns (1 = immune). */
+  tenacity?: number;
+  /** Fraction of max HP regenerated per second (stopped while burning). */
+  regen?: number;
+  /** Heals nearby monsters: fraction of their max HP per second, within radius tiles. */
+  heal?: { pct: number; radius: number };
+  /** Number of direct hits fully blocked before it takes damage. */
+  shield?: number;
+  /** On death, splits into n monsters of this id. */
+  split?: { id: string; n: number };
+  /** Cannot be set on fire (immune to burns). */
+  fireproof?: boolean;
 }
 
 export type MapStyle = 'rift' | 'jungle' | 'bridge' | 'tundra' | 'desert' | 'haunted' | 'demacia' | 'noxus' | 'ionia' | 'piltover';

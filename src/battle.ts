@@ -54,6 +54,10 @@ export interface Enemy {
   ky: number;
   sq: number;
   born: number;
+  /** Direct hits its shield still blocks. */
+  shield: number;
+  /** Render only: seconds of healing glow left. */
+  healed: number;
 }
 
 export interface Tower {
@@ -617,7 +621,7 @@ export class Battle {
       this.vfx?.light(target.x, target.y - 40, 60, '#ffd84a', 0.7, 0.3);
     } else if (id === 'exhaust') {
       if (!alive.length) return;
-      for (const e of alive) { e.slowPct = Math.max(e.slowPct, 0.6); e.slowT = Math.max(e.slowT, 3); }
+      for (const e of alive) { const k = this.grip(e); if (k > 0) { e.slowPct = Math.max(e.slowPct, 0.6 * k); e.slowT = Math.max(e.slowT, 3); } }
     } else {
       this.lives = Math.min(MAX_LIVES, this.lives + 5);
     }
@@ -644,7 +648,7 @@ export class Battle {
   }
 
   private addBurn(e: Enemy, dps: number, dur: number, src: Tower): void {
-    if (e.dead) return;
+    if (e.dead || e.def.fireproof) return;
     if (e.burns.length >= 6) e.burns.shift();
     e.burns.push({ dps, t: dur, src });
   }
@@ -706,8 +710,9 @@ export class Battle {
       const c = fx.radius ? this.densest(alive, fx.radius) : null, r = (fx.radius ?? 0) * TILE;
       for (const e of alive) {
         if (c && Math.hypot(e.x - c.x, e.y - c.y) > r + e.def.size) continue;
-        if (fx.slow) { e.slowPct = Math.max(e.slowPct, fx.slow); e.slowT = Math.max(e.slowT, fx.slowDur ?? 3); }
-        if (fx.stun) e.stunT = Math.max(e.stunT, fx.stun * (e.def.boss ? 0.3 : 1));
+        const k = this.grip(e);
+        if (fx.slow && k > 0) { e.slowPct = Math.max(e.slowPct, fx.slow * k); e.slowT = Math.max(e.slowT, fx.slowDur ?? 3); }
+        if (fx.stun && k > 0) e.stunT = Math.max(e.stunT, fx.stun * k * (e.def.boss ? 0.3 : 1));
         if (fx.mult) this.damage(e, dmg * fx.mult, t, false);
       }
       if (vis) {
@@ -883,16 +888,23 @@ export class Battle {
     if (this.waveActive && !this.queue.length && !this.enemies.length && !this.over) this.waveCleared();
   }
 
-  private spawn(id: string): void {
+  /** Spawns a monster at the start of the next lane, or at a given point of a lane (splitting monsters). */
+  private spawn(id: string, at?: { s: number; lane: number }): void {
     const def = ENEMIES[id];
     const hp = def.hp * hpScale(this.map, this.wave);
-    const lane = this.spawnCount++ % this.lanes.length;
-    const p = this.posAt(0, lane);
+    const lane = at ? at.lane : this.spawnCount++ % this.lanes.length;
+    const s0 = at?.s ?? 0;
+    const p = this.posAt(s0, lane);
     this.enemies.push({
-      uid: ++this.uid, def, hp, maxHp: hp, s: 0, x: p.x, y: p.y, lane,
+      uid: ++this.uid, def, hp, maxHp: hp, s: s0, x: p.x, y: p.y, lane,
       slowPct: 0, slowT: 0, stunT: 0, burns: [], dead: false, hitFlash: 0, face: 1, phase: Math.random() * 6,
-      kx: 0, ky: 0, sq: 0, born: 0,
+      kx: 0, ky: 0, sq: 0, born: at ? 0.2 : 0, shield: def.shield ?? 0, healed: 0,
     });
+  }
+
+  /** How much of a slow or stun gets through this monster's tenacity (0 = immune). */
+  private grip(e: Enemy): number {
+    return 1 - (e.def.tenacity ?? 0);
   }
 
   private updateEnemies(dt: number): void {
@@ -905,9 +917,22 @@ export class Battle {
       }
       e.burns = e.burns.filter((b) => b.t > 0);
       if (e.dead) continue;
+      if (e.def.regen && !e.burns.length && e.hp < e.maxHp) {
+        e.hp = Math.min(e.maxHp, e.hp + e.maxHp * e.def.regen * dt);
+        e.healed = 0.3;
+      }
+      if (e.def.heal && e.stunT <= 0) {
+        // Healers mend everyone around them (not each other, not bosses)
+        const hr = e.def.heal.radius * TILE;
+        for (const o of this.enemies) {
+          if (o === e || o.dead || o.def.boss || o.def.heal || o.hp >= o.maxHp || Math.hypot(o.x - e.x, o.y - e.y) > hr) continue;
+          o.hp = Math.min(o.maxHp, o.hp + o.maxHp * e.def.heal.pct * dt);
+          o.healed = 0.3;
+        }
+      }
       if (e.slowT > 0) e.slowT -= dt; else e.slowPct = 0;
       if (e.stunT > 0) { e.stunT -= dt; continue; }
-      const river = this.featureAt(Math.floor(e.x / TILE), Math.floor(e.y / TILE)) === 'river' ? 0.8 : 1;
+      const river = !e.def.fly && this.featureAt(Math.floor(e.x / TILE), Math.floor(e.y / TILE)) === 'river' ? 0.8 : 1;
       e.s += e.def.speed * TILE * (1 - e.slowPct) * river * dt;
       const p = this.posAt(e.s, e.lane);
       if (Math.abs(p.x - e.x) > 0.01) e.face = p.x > e.x ? 1 : -1;
@@ -1074,7 +1099,20 @@ export class Battle {
     if (this.visual) sfx('hit');
     const s = t.stats;
     t.hits++;
+    if (e.shield > 0) {
+      // The shield swallows the whole hit
+      e.shield--;
+      e.hitFlash = 0.08;
+      if (this.vfx) {
+        this.vfx.sparks(e.x, e.y - 10, Math.atan2(e.y - t.y, e.x - t.x) + Math.PI, 2.4, 6, 190, '#bfe9ff', 1.6, e.y + 15);
+        this.fx.push({ kind: 'ring', x: e.x, y: e.y - 8, r: 22, t: 0, max: 0.25, color: '#bfe9ff' });
+        if (e.shield === 0) this.fx.push({ kind: 'text', x: e.x, y: e.y - 30, t: 0, max: 0.7, color: '#bfe9ff', text: 'Bouclier brisé', size: 12 });
+      }
+      return;
+    }
     let dmg = (s.dmg + t.runStacks) * mult;
+    // Flyers slip out of area attacks
+    if (e.def.fly && (s.type === 'splash' || s.type === 'aura')) dmg *= 0.5;
     let crit = false;
     if (s.everyN && t.hits % s.everyN.n === 0) { dmg *= s.everyN.mult; crit = true; }
     if (s.crit && Math.random() < s.crit.chance) { dmg *= s.crit.mult; crit = true; }
@@ -1087,9 +1125,10 @@ export class Battle {
     if (s.pctHp && t.hits % s.pctHp.every === 0) this.damage(e, e.maxHp * s.pctHp.pct, t, true);
     if (e.dead) return;
     e.hitFlash = 0.08;
-    if (s.slow && s.slow.pct >= e.slowPct) { e.slowPct = Math.min(0.8, s.slow.pct); e.slowT = s.slow.dur; }
-    if (s.stun && Math.random() < s.stun.chance) e.stunT = Math.max(e.stunT, s.stun.dur * (e.def.boss ? 0.3 : 1));
-    if (s.burn) {
+    const grip = this.grip(e);
+    if (s.slow && grip > 0 && s.slow.pct * grip >= e.slowPct) { e.slowPct = Math.min(0.8, s.slow.pct * grip); e.slowT = s.slow.dur; }
+    if (s.stun && grip > 0 && Math.random() < s.stun.chance) e.stunT = Math.max(e.stunT, s.stun.dur * grip * (e.def.boss ? 0.3 : 1));
+    if (s.burn && !e.def.fireproof) {
       if (e.burns.length >= 6) e.burns.shift();
       e.burns.push({ dps: (s.dmg + t.runStacks) * s.burn.mult, t: s.burn.dur, src: t });
     }
@@ -1194,6 +1233,9 @@ export class Battle {
       this.fx.push({ kind: 'text', x: e.x, y: e.y - 24, t: 0, max: 1.2, color: '#f5c542', text: `+${fmtShort(gold)}` });
     }
     this.dropLoot(e);
+    if (e.def.split && !this.over) {
+      for (let i = 0; i < e.def.split.n; i++) this.spawn(e.def.split.id, { s: Math.max(0, e.s - i * 12), lane: e.lane });
+    }
     if (!src) return;
     src.kills++;
     const ks = src.stats.killStack;
@@ -1327,6 +1369,7 @@ export class Battle {
     const settle = Math.exp(-dt * 13), unsquash = Math.exp(-dt * 11);
     for (const e of this.enemies) {
       e.born += gameDt;
+      e.healed = Math.max(0, e.healed - gameDt);
       e.kx *= settle;
       e.ky *= settle;
       e.sq *= unsquash;
@@ -1920,36 +1963,75 @@ export class Battle {
   }
 
   private drawEnemy(g: CanvasRenderingContext2D, e: Enemy): void {
-    const fly = e.def.id === 'drake' || e.def.id === 'fallenking' || e.def.id === 'spiritguard';
-    const h = (CREATURE_HEIGHT[e.def.id] ?? 16) * 3, w = h * 0.9;
+    const d = e.def;
+    const fly = !!d.fly || d.id === 'drake' || d.id === 'fallenking' || d.id === 'spiritguard';
+    const epic = d.shape === 'boss';
+    const h = (CREATURE_HEIGHT[d.id] ?? 16) * 3, w = h * 0.9;
     // Drawn where the last blow shoved it; the simulation keeps the true position
-    const x = e.x + e.kx, y = e.y + 15 + e.ky;
-    const ph = e.stunT > 0 ? 0 : e.phase;
+    const x = e.x + e.kx, gy = e.y + 15 + e.ky;
+    // Flyers hover above the lane; their shadow stays on the ground
+    const lift = d.fly ? 14 + Math.sin(this.clock * 4 + e.uid) * 3 : 0;
+    const y = gy - lift;
+    const moving = e.stunT <= 0;
+    const ph = moving ? e.phase : 0;
     // Steps out of the portal: grows and fades in over the first moments
     const born = Math.min(1, e.born / 0.3), grow = 0.55 + 0.45 * (1 - (1 - born) * (1 - born));
-    if (e.def.boss) {
+    if (epic) {
+      // Epic monsters and bosses carry an aura of their own colour
       g.globalCompositeOperation = 'screen';
-      drawGlow(g, x, y - h / 2, w * 0.8, e.def.color, 0.45 + Math.sin(this.clock * 3) * 0.08);
+      drawGlow(g, x, y - h / 2, w * (d.boss ? 0.85 : 0.7), d.color, (d.boss ? 0.45 : 0.3) + Math.sin(this.clock * 3) * 0.08);
       g.globalCompositeOperation = 'source-over';
     }
+    if (d.heal) {
+      // Healing field: a soft green circle that pulses outward
+      const hr = d.heal.radius * TILE, pulse = (this.clock * 0.7 + e.uid * 0.37) % 1;
+      g.strokeStyle = '#6be08a';
+      g.lineWidth = 1.5;
+      g.globalAlpha = 0.22;
+      g.beginPath(); g.ellipse(x, gy - 8, hr, hr * 0.8, 0, 0, Math.PI * 2); g.stroke();
+      g.globalAlpha = 0.4 * (1 - pulse);
+      g.beginPath(); g.ellipse(x, gy - 8, hr * pulse, hr * 0.8 * pulse, 0, 0, Math.PI * 2); g.stroke();
+      g.globalAlpha = 1;
+    }
     // Soft shadow, lighter and smaller under flyers
-    drawGlow(g, x + 2, y + 1, w * (fly ? 0.36 : 0.46) * grow, '#000000', (fly ? 0.32 : 0.55) * born, Math.max(4, w * 0.13) * grow);
+    drawGlow(g, x + 2, gy + 1, w * (fly ? 0.34 : 0.46) * grow, '#000000', (fly ? 0.3 : 0.55) * born, Math.max(4, w * 0.13) * grow);
     if (e === this.selectedEnemy) {
       const pulse = 1 + Math.sin(this.clock * 5) * 0.06;
       g.strokeStyle = '#ffd84a';
-      g.shadowColor = '#ffd84a';
-      g.shadowBlur = 10;
       g.lineWidth = 2.5;
       g.beginPath();
-      g.ellipse(x, y, w * 0.5 * pulse, Math.max(6, w * 0.15) * pulse, 0, 0, Math.PI * 2);
+      g.ellipse(x, gy, w * 0.5 * pulse, Math.max(6, w * 0.15) * pulse, 0, 0, Math.PI * 2);
       g.stroke();
-      g.shadowBlur = 0;
+      g.globalCompositeOperation = 'lighter';
+      drawGlow(g, x, gy, w * 0.6, '#ffd84a', 0.35, Math.max(8, w * 0.2));
+      g.globalCompositeOperation = 'source-over';
     }
-    // The body squashes when hit and springs back
-    const custom = mobImage(e.def.id);
+    if (e.slowPct > 0) {
+      // Frost on the ground with a few ice crystals
+      g.fillStyle = 'rgba(143,211,255,0.22)';
+      g.strokeStyle = 'rgba(200,236,255,0.9)';
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.ellipse(x, gy, w * 0.46, Math.max(5, w * 0.13), 0, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      g.fillStyle = '#e8f7ff';
+      for (let i = 0; i < 3; i++) {
+        const cx = x + (i - 1) * w * 0.3, cy = gy + (i === 1 ? 3 : 0), ch = 5 + e.slowPct * 6;
+        g.beginPath();
+        g.moveTo(cx, cy - ch); g.lineTo(cx + 2.2, cy); g.lineTo(cx - 2.2, cy);
+        g.closePath();
+        g.fill();
+      }
+    }
+    // The body: sways as it walks, leans into its stride, squashes when hit and springs back
+    const custom = mobImage(d.id);
+    const stride = moving ? Math.sin(ph * Math.PI) : 0;
     g.save();
     g.translate(x, y);
-    g.scale((1 + e.sq * 0.14) * grow, (1 - e.sq * 0.16) * grow);
+    if (!fly && !epic) g.rotate(stride * 0.045 + e.face * 0.03 * (moving ? 1 : 0));
+    const breathe = 1 + Math.sin(this.clock * 2.6 + e.uid) * 0.012;
+    g.scale((1 + e.sq * 0.14) * grow * (fly ? 1 + Math.sin(this.clock * 13 + e.uid) * 0.03 : 1), (1 - e.sq * 0.16) * grow * breathe);
     if (born < 1) g.globalAlpha *= born;
     if (custom) {
       const ih = h, iw = (custom.naturalWidth / custom.naturalHeight) * ih;
@@ -1957,26 +2039,25 @@ export class Battle {
       if (e.face < 0) g.scale(-1, 1);
       g.drawImage(custom, -iw / 2, -ih, iw, ih);
     } else {
-      drawCreature(g, e.def.id, 0, 0, e.face, ph, this.clock, e.def.color, e.hitFlash > 0, 3);
+      drawCreature(g, d.id, 0, 0, e.face, ph, this.clock, d.color, e.hitFlash > 0, 3);
     }
     g.restore();
-    if (e.slowPct > 0) {
-      // Frost on the ground with a few ice crystals
-      g.fillStyle = 'rgba(143,211,255,0.22)';
-      g.strokeStyle = 'rgba(200,236,255,0.9)';
+    if (e.healed > 0) {
+      // Being healed: a green shimmer over the body
+      g.globalCompositeOperation = 'lighter';
+      drawGlow(g, x, y - h * 0.45, w * 0.5, '#6be08a', 0.5 * Math.min(1, e.healed / 0.3));
+      g.globalCompositeOperation = 'source-over';
+      if (Math.random() < 0.12) this.vfx?.embers(x, y - h * 0.4, 1, '#6be08a', '#d8ffe0', w * 0.3);
+    }
+    if (e.shield > 0) {
+      // Shield: a bubble of light around the monster
+      const pulse = 1 + Math.sin(this.clock * 4 + e.uid) * 0.04;
+      g.globalCompositeOperation = 'lighter';
+      drawGlow(g, x, y - h * 0.45, w * 0.62 * pulse, '#8fd8ff', 0.22, h * 0.62 * pulse);
+      g.globalCompositeOperation = 'source-over';
+      g.strokeStyle = 'rgba(191,233,255,0.85)';
       g.lineWidth = 1.6;
-      g.beginPath();
-      g.ellipse(x, y, w * 0.46, Math.max(5, w * 0.13), 0, 0, Math.PI * 2);
-      g.fill();
-      g.stroke();
-      g.fillStyle = '#e8f7ff';
-      for (let i = 0; i < 3; i++) {
-        const cx = x + (i - 1) * w * 0.3, cy = y + (i === 1 ? 3 : 0), ch = 5 + e.slowPct * 6;
-        g.beginPath();
-        g.moveTo(cx, cy - ch); g.lineTo(cx + 2.2, cy); g.lineTo(cx - 2.2, cy);
-        g.closePath();
-        g.fill();
-      }
+      g.beginPath(); g.ellipse(x, y - h * 0.45, w * 0.5 * pulse, h * 0.56 * pulse, 0, 0, Math.PI * 2); g.stroke();
     }
     if (e.stunT > 0) {
       g.fillStyle = '#ffd84a';
@@ -1988,21 +2069,32 @@ export class Battle {
       }
     }
     if (e.burns.length && Math.random() < 0.35) this.burst(x + (Math.random() - 0.5) * w * 0.6, y - h * 0.5, Math.random() < 0.5 ? '#ffb347' : '#ff5a2a', 1, 34, 2);
-    // HP bar (LoL style: dark frame, segmented fill)
-    const bw = Math.max(30, Math.min(110, w * 0.95)), pct = Math.max(0, e.hp / e.maxHp), by = y - h - 10;
+    // Health bar: dark frame coloured by tier, gradient fill, segments
+    const bw = Math.max(30, Math.min(110, w * 0.95)), pct = Math.max(0, Math.min(1, e.hp / e.maxHp)), by = y - h - 11;
+    g.fillStyle = d.boss ? '#c084fc' : epic ? '#c8aa6e' : '#010a13';
+    g.beginPath(); g.roundRect(x - bw / 2 - 2.5, by - 2.5, bw + 5, 9, 3); g.fill();
     g.fillStyle = '#010a13';
-    g.fillRect(x - bw / 2 - 1.5, by - 1.5, bw + 3, 7);
-    g.fillStyle = e.def.boss ? '#a855f7' : '#d13a3a';
-    g.fillRect(x - bw / 2, by, bw * pct, 4);
-    g.fillStyle = 'rgba(255,255,255,0.25)';
-    g.fillRect(x - bw / 2, by, bw * pct, 1.5);
-    g.fillStyle = 'rgba(0,0,0,0.5)';
+    g.beginPath(); g.roundRect(x - bw / 2 - 1.5, by - 1.5, bw + 3, 7, 2.5); g.fill();
+    if (pct > 0) {
+      const fill = g.createLinearGradient(0, by, 0, by + 4);
+      const [c0, c1] = d.boss ? ['#d9a8ff', '#8a3fd6'] : pct < 0.3 ? ['#ffb347', '#d1622a'] : ['#ff7a7a', '#c22e2e'];
+      fill.addColorStop(0, c0);
+      fill.addColorStop(1, c1);
+      g.fillStyle = fill;
+      g.beginPath(); g.roundRect(x - bw / 2, by, bw * pct, 4, 1.5); g.fill();
+    }
+    g.fillStyle = 'rgba(1,10,19,0.55)';
     for (let i = 1; i < 4; i++) g.fillRect(x - bw / 2 + (bw * i) / 4, by, 1, 4);
-    // Status pips above the bar: slow (blue), burn (orange), stun (yellow)
-    const pips = [e.slowPct > 0 ? '#8fd3ff' : '', e.burns.length ? '#ff8a3d' : '', e.stunT > 0 ? '#ffd84a' : ''].filter(Boolean);
-    pips.forEach((col, i) => {
+    // Pips above the bar: shield charges (pale blue squares), then slow, burn, stun
+    const pips: [string, boolean][] = [];
+    for (let i = 0; i < e.shield; i++) pips.push(['#bfe9ff', true]);
+    if (e.slowPct > 0) pips.push(['#8fd3ff', false]);
+    if (e.burns.length) pips.push(['#ff8a3d', false]);
+    if (e.stunT > 0) pips.push(['#ffd84a', false]);
+    pips.forEach(([col, square], i) => {
       const px = x - (pips.length - 1) * 4 + i * 8, py = by - 7;
       g.fillStyle = '#010a13';
+      if (square) { g.fillRect(px - 3.6, py - 3.6, 7.2, 7.2); g.fillStyle = col; g.fillRect(px - 2.4, py - 2.4, 4.8, 4.8); return; }
       g.beginPath(); g.moveTo(px, py - 4); g.lineTo(px + 4, py); g.lineTo(px, py + 4); g.lineTo(px - 4, py); g.closePath(); g.fill();
       g.fillStyle = col;
       g.beginPath(); g.moveTo(px, py - 2.6); g.lineTo(px + 2.6, py); g.lineTo(px, py + 2.6); g.lineTo(px - 2.6, py); g.closePath(); g.fill();

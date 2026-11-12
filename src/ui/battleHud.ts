@@ -1,10 +1,10 @@
 import { squareUrl, splashUrl } from '../art/champArt';
-import { CREATURE_HEIGHT, drawCreature } from '../art/creatures';
+import { CREATURE_HEIGHT, creatureReady, drawCreature } from '../art/creatures';
 import { FEATURE_INFO } from '../art/mapArt';
 import { Battle, initials, PRIORITIES, SPELLS, type Enemy, type SpellId, type Tower } from '../battle';
 import { SYN_TIERS, synText, teamSynergies } from '../data/synergies';
 import type { Priority } from '../types';
-import { ENEMIES } from '../data/enemies';
+import { ENEMIES, enemyTraits } from '../data/enemies';
 import { lootRolls, lootTable, MAT_BY_ID, MATERIALS } from '../data/loot';
 import { matChip } from './inventory';
 import { MAP_BY_ID } from '../data/maps';
@@ -102,9 +102,11 @@ function creatureIcon(id: string): string {
     const h = CREATURE_HEIGHT[id] ?? 16;
     drawCreature(g, id, 36, 64, 1, 0.3, 1, ENEMIES[id]?.color ?? '#888', false, Math.min(3, 54 / h));
     url = c.toDataURL();
-    creatureIcons.set(id, url);
+    if (creatureReady(id)) creatureIcons.set(id, url);
   }
-  return `<img class="cicon" src="${url}" alt="" title="${esc(enemyName(id))}">`;
+  const traits = ENEMIES[id] ? enemyTraits(ENEMIES[id]) : [];
+  const tip = enemyName(id) + traits.map((t) => `\n${t.icon} ${t.name} : ${t.desc}`).join('');
+  return `<img class="cicon" src="${url}" alt="" title="${esc(tip)}">`;
 }
 function towerPanel(t: Tower): string {
   const def = t.def, lvl = level(def.id);
@@ -201,7 +203,7 @@ function wavePanel(b: Battle): string {
     </div>
     <div class="hud-card">
       <div class="hud-title">Prochaine vague</div>
-      <div class="next-wave">${next.length ? next.map((x) => `<div class="nw">${creatureIcon(x.id)}<span>x${x.n}</span></div>`).join('') : '<span class="small muted">—</span>'}</div>
+      <div class="next-wave">${next.length ? next.map((x) => `<div class="nw">${creatureIcon(x.id)}<span>x${x.n}</span><i class="nw-traits">${enemyTraits(ENEMIES[x.id]).map((t) => t.icon).join('')}</i></div>`).join('') : '<span class="small muted">—</span>'}</div>
     </div>
     <div class="hud-card">
       <div class="hud-title">Synergies</div>
@@ -262,6 +264,7 @@ function enemyCard(b: Battle, e: Enemy): string {
     <div class="run-line"><span>Armure</span><b>${armor}</b></div>
     <div class="run-line"><span>Butin</span><b>◆ ${fmt(b.enemyReward(e))}</b></div>
     <div class="cc-tags">${status}</div>
+    ${enemyTraits(d).map((t) => `<div class="trait"><span>${t.icon}</span><div><b>${esc(t.name)}</b><span class="small muted">${esc(t.desc)}</span></div></div>`).join('')}
     <div class="small muted" style="margin-top:6px">Butin possible${lootRolls(d) > 1 ? ` · ${lootRolls(d)} tirages` : ''}</div>
     <div class="mat-row">${lootTable(d, b.map.region ?? '').map((x) => matChip(x)).join('')}</div>`;
 }

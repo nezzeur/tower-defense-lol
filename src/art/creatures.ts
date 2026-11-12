@@ -4,6 +4,7 @@
 import { shade } from './color';
 import { DESIGN_SVG } from './mobDesign';
 import { EXTRA_SVG } from './mobExtra';
+import { REGION_SVG } from './mobRegion';
 
 type G = CanvasRenderingContext2D;
 const OUT = '#120e18';
@@ -424,6 +425,10 @@ export const CREATURE_HEIGHT: Record<string, number> = {
   melee: 16, caster: 17, cannon: 14, super: 24, scuttle: 12, wolf: 15, raptor: 17, krug: 16, gromp: 16,
   drake: 30, herald: 14, riftherald: 28, baron: 50, poroking: 34, colossus: 40, sentinel: 40, fallenking: 40,
   petricite: 40, warbeast: 28, spiritguard: 40, automaton: 40,
+  dem_soldier: 17, dem_knight: 21, dem_hunter: 17, dem_wing: 15,
+  frl_raider: 17, frl_wolf: 15, frl_troll: 26, frl_witch: 18,
+  nox_legion: 17, nox_hound: 15, nox_basilisk: 20, nox_mage: 18,
+  ion_acolyte: 17, ion_ninja: 16, ion_crane: 16, ion_oni: 26, ion_wisp: 11,
 };
 
 /** scale > 1 draws the creature in HD (smooth vector mode) at that size multiplier. */
@@ -464,6 +469,11 @@ export function drawCreature(g: G, id: string, x: number, y: number, facing: num
   g.restore();
 }
 
+/** False while a creature's vector art is still being decoded (callers should not cache what they draw). */
+export function creatureReady(id: string): boolean {
+  return sprite(id) !== null || !(DESIGN_SVG[id] ?? EXTRA_SVG[id] ?? REGION_SVG[id]);
+}
+
 // ---------- Vector sprites (cartoon bestiary): SVG pre-rendered once per type to an offscreen canvas ----------
 interface Sprite { cv: HTMLCanvasElement; k: number } // k = canvas px per SVG unit
 const sprites = new Map<string, Sprite | null>();
@@ -472,13 +482,17 @@ const TOP: Record<string, number> = {
   melee: 24, caster: 10, cannon: 34, super: 4, scuttle: 56, wolf: 32, raptor: 22, krug: 48, gromp: 42, drake: 28,
   herald: 78, riftherald: 16, baron: 18, poroking: 18, colossus: 8, sentinel: 6, fallenking: 16, petricite: 16,
   warbeast: 24, spiritguard: 14, automaton: 0,
+  dem_soldier: 2, dem_knight: 2, dem_hunter: 6, dem_wing: 24,
+  frl_raider: 4, frl_wolf: 44, frl_troll: 16, frl_witch: 6,
+  nox_legion: 2, nox_hound: 44, nox_basilisk: 30, nox_mage: 6,
+  ion_acolyte: 6, ion_ninja: 10, ion_crane: 24, ion_oni: 20, ion_wisp: 56,
 };
-const FLOATERS = new Set(['drake', 'fallenking', 'spiritguard', 'caster']);
+const FLOATERS = new Set(['drake', 'fallenking', 'spiritguard', 'caster', 'dem_wing', 'ion_crane', 'ion_wisp', 'frl_witch', 'nox_mage', 'ion_acolyte']);
 const RES = 6; // canvas px per low-res px of creature height
 
 function sprite(id: string): Sprite | null {
   if (sprites.has(id)) return sprites.get(id)!;
-  const body = DESIGN_SVG[id] ?? EXTRA_SVG[id];
+  const body = DESIGN_SVG[id] ?? EXTRA_SVG[id] ?? REGION_SVG[id];
   if (!body || typeof document === 'undefined') { sprites.set(id, null); return null; }
   const top = TOP[id] ?? 20;
   const k = (RES * (CREATURE_HEIGHT[id] ?? 16)) / (184 - top);
