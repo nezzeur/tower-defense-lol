@@ -4,6 +4,7 @@ import { COLS, ROWS } from '../data/maps';
 import type { Landmark, MapDef, MapStyle } from '../types';
 import { featureTiles, landmarkTiles, pathGeometry, terrainAt } from './mapArt';
 import { shade } from './color';
+import { dressGround, grade, regionProp, type MapLight } from './regionArt';
 
 type G = CanvasRenderingContext2D;
 
@@ -698,11 +699,22 @@ function landmark(g: G, l: Landmark, tile: number, accent: string, r: () => numb
   }
 }
 
-export function drawMapHD(g: G, map: MapDef, W: number, H: number, tile: number): void {
+/** Paints the whole map; returns the light sources it contains (animated by the battle renderer). */
+export function drawMapHD(g: G, map: MapDef, W: number, H: number, tile: number): MapLight[] {
   const style = map.theme.style, look = LOOKS[style];
   const geo = pathGeometry(map, tile);
   const r = rng(seedOf(map.id));
+  const lights: MapLight[] = [];
   ground(g, look, W, H, r);
+  {
+    // Region ground details on plain, lane-free tiles only
+    const marks0 = landmarkTiles(map), feats0 = featureTiles(map);
+    dressGround(g, style, W, H, r, (x, y) => {
+      const c = Math.floor(x / tile), row = Math.floor(y / tile), key = `${c},${row}`;
+      const ch = map.terrain ? terrainAt(map, c, row) : '.';
+      return !geo.tiles.has(key) && !marks0.has(key) && !feats0.has(key) && (ch === '.' || ch === ',');
+    }, lights);
+  }
   if (style === 'piltover') tiles(g, W, H, shade(look.ground[0], -0.25));
   if (style === 'bridge') {
     // Abyss: dark chasm with mist and snowy cliffs top and bottom
@@ -796,8 +808,10 @@ export function drawMapHD(g: G, map: MapDef, W: number, H: number, tile: number)
   if (map.terrain) {
     const extra: { y: number; draw: () => void }[] = [];
     for (let c = 0; c < COLS; c++) for (let row = 0; row < ROWS; row++) {
-      if (!free(c, row) || features.has(`${c},${row}`) || marks.has(`${c},${row}`) || terrainAt(map, c, row) !== '.' || r() > 0.12) continue;
+      if (!free(c, row) || features.has(`${c},${row}`) || marks.has(`${c},${row}`) || terrainAt(map, c, row) !== '.' || r() > 0.2) continue;
       const x = (c + 0.3 + r() * 0.4) * tile, y = (row + 0.5 + r() * 0.3) * tile, k = r();
+      const piece = regionProp(g, style, x, y, r, lights);
+      if (piece) { extra.push({ y, draw: piece }); continue; }
       if (k > 0.75 && style === 'demacia') extra.push({ y, draw: () => banner(g, x, y, '#2f5fb0', '#f5d76e') });
       else if (k > 0.75 && style === 'noxus') extra.push({ y, draw: () => spikes(g, x, y) });
       else if (k > 0.75 && style === 'ionia') extra.push({ y, draw: () => lantern(g, x, y, '#ffb347', false) });
@@ -811,15 +825,6 @@ export function drawMapHD(g: G, map: MapDef, W: number, H: number, tile: number)
   // Allied turrets (functional, see Battle.updateTurrets)
   for (const f of map.features ?? []) if (f.kind === 'turret') turret(g, (f.c + 0.5) * tile, (f.r + 0.5) * tile + 14, map.theme.accent);
 
-  // Warm light and vignette
-  const light = g.createRadialGradient(W * 0.35, H * 0.25, 0, W * 0.35, H * 0.25, W * 0.7);
-  light.addColorStop(0, 'rgba(255,240,200,0.16)');
-  light.addColorStop(1, 'rgba(255,240,200,0)');
-  g.fillStyle = light;
-  g.fillRect(0, 0, W, H);
-  const v = g.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.72);
-  v.addColorStop(0, 'rgba(0,0,0,0)');
-  v.addColorStop(1, 'rgba(0,0,0,0.22)');
-  g.fillStyle = v;
-  g.fillRect(0, 0, W, H);
+  grade(g, style, W, H);
+  return lights;
 }

@@ -7,6 +7,7 @@ import { shade } from './art/color';
 import { angDiff, drawGlow } from './art/glow';
 import { drawHero, drawShot, hasTrail, HERO_HEAD, heroLook, impactColors, lightColor, SHOT_ARC, SHOT_SPEED, type Shot } from './art/heroes';
 import { Vfx } from './art/vfx';
+import type { MapLight } from './art/regionArt';
 import { sfx } from './audio';
 import { ENEMIES } from './data/enemies';
 import { MAT_BY_ID, rollLoot } from './data/loot';
@@ -211,6 +212,9 @@ export class Battle {
   private dim = 0;
   private readonly calm = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   private motes: Mote[] = [];
+  /** Light sources painted into the map (braziers, crystals, lanterns...) and centres of its water tiles. */
+  private mapLights: MapLight[] = [];
+  private waterTiles: { x: number; y: number }[] = [];
   private clock = 0;
   private shake = 0;
   private nexusHurt = 0;
@@ -240,7 +244,7 @@ export class Battle {
     this.bg.height = H * dpr;
     const bgc = this.bg.getContext('2d')!;
     bgc.scale(dpr, dpr);
-    drawMapHD(bgc, this.map, W, H, TILE);
+    this.mapLights = drawMapHD(bgc, this.map, W, H, TILE);
     // Soft vignette baked into the terrain: frames the board and lets the lights stand out.
     const vg = bgc.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, W * 0.75);
     vg.addColorStop(0, 'rgba(1,10,19,0)');
@@ -277,6 +281,12 @@ export class Battle {
     this.blocked = landmarkTiles(this.map);
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       if ('TR~'.includes(terrainAt(this.map, c, r))) this.blocked.add(`${c},${r}`);
+    }
+    this.waterTiles = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      if (!this.pathTiles.has(`${c},${r}`) && (terrainAt(this.map, c, r) === '~' || this.features.get(`${c},${r}`) === 'river')) {
+        this.waterTiles.push({ x: (c + 0.5) * TILE, y: (r + 0.5) * TILE });
+      }
     }
     this.turrets = (this.map.features ?? []).filter((f) => f.kind === 'turret')
       .map((f) => ({ x: (f.c + 0.5) * TILE, y: (f.r + 0.5) * TILE, cd: 0 }));
@@ -1331,8 +1341,10 @@ export class Battle {
     v.update(dt, gameDt);
 
     const style = this.map.theme.style;
-    const rate = style === 'jungle' ? 0.5 : style === 'haunted' ? 0.45 : 0.3;
-    if (this.motes.length < 50 && Math.random() < rate) this.motes.push(spawnMote(style));
+    // Weather: heavy snow in the Freljord, petals in Ionia, embers in Noxus
+    const amb = AMBIENT[style] ?? AMBIENT_DEFAULT;
+    const cap = v.low ? 30 : amb.motes;
+    for (let i = 0; i < 2; i++) if (this.motes.length < cap && Math.random() < amb.rate) this.motes.push(spawnMote(style));
     for (const m of this.motes) {
       m.life += dt;
       m.x += m.vx * dt + (style === 'rift' || style === 'tundra' ? Math.sin(m.life * 2) * 0.1 : 0);
@@ -1356,6 +1368,20 @@ export class Battle {
       g.fillStyle = '#01080f';
       g.globalAlpha = 0.45 * this.dim;
       g.fillRect(-20, -20, W + 40, H + 40);
+      g.globalAlpha = 1;
+    }
+    // Water glints: little stars of light blinking on rivers and lakes
+    const style = this.map.theme.style, amb = AMBIENT[style] ?? AMBIENT_DEFAULT;
+    if (!v.low && this.waterTiles.length) {
+      g.fillStyle = style === 'noxus' ? '#ffd27a' : '#ffffff';
+      this.waterTiles.forEach((w, i) => {
+        const a = Math.sin(this.clock * 1.7 + i * 2.4);
+        if (a < 0.5) return;
+        const k = (a - 0.5) / 0.5, x = w.x + Math.sin(i * 12.9) * 17, y = w.y + Math.cos(i * 7.3) * 15;
+        g.globalAlpha = k * 0.85;
+        g.fillRect(x - 6 * k, y - 0.7, 12 * k, 1.4);
+        g.fillRect(x - 0.7, y - 3 * k, 1.4, 6 * k);
+      });
       g.globalAlpha = 1;
     }
     v.drawDecals(g);
@@ -1596,9 +1622,47 @@ export class Battle {
 
     v.drawParticles(g);
 
+    // Drifting cloud shadows, smoke or snow squalls pass over the whole scene
+    if (!v.low && amb.cloud) {
+      for (let i = 0; i < 3; i++) {
+        const x = ((this.clock * amb.wind + i * 470) % (W + 640)) - 320;
+        drawGlow(g, x, H * (0.18 + 0.32 * i) + Math.sin(this.clock * 0.2 + i) * 30, 270, amb.cloud, amb.cloudA, 140);
+      }
+    }
+
     // Light pass: everything that glows brightens the ground and whoever stands next to it
     if (!v.low) {
       g.globalCompositeOperation = 'screen';
+      const c = this.clock;
+      this.mapLights.forEach((l, i) => {
+        const fl = 1 + Math.sin(c * 11 + i * 7) * Math.sin(c * 5.3 + i) * 0.22 * l.flicker;
+        drawGlow(g, l.x, l.y, l.r * fl, l.color, 0.5 * fl);
+      });
+      if (style === 'demacia' || style === 'rift' || style === 'jungle') {
+        // Shafts of sunlight slanting across the field
+        for (let i = 0; i < 3; i++) {
+          g.save();
+          g.translate(W * (0.16 + 0.3 * i) + Math.sin(c * 0.25 + i) * 30, -60);
+          g.rotate(0.45);
+          drawGlow(g, 0, 340, 62, '#fff1c0', (style === 'demacia' ? 0.13 : 0.07) + 0.04 * Math.sin(c * 0.6 + i * 2), 470);
+          g.restore();
+        }
+      } else if (style === 'tundra' || style === 'bridge') {
+        // Aurora rippling along the top of the map
+        for (let i = 0; i < 4; i++) {
+          drawGlow(g, W * (0.1 + 0.27 * i) + Math.sin(c * 0.3 + i) * 60, 12, 200, i % 2 ? '#7fffd4' : '#8fb8ff', 0.2 + 0.08 * Math.sin(c * 0.8 + i * 1.7), 50);
+        }
+      } else if (style === 'noxus') {
+        // The forges breathe: a red glow pulsing from below
+        drawGlow(g, W / 2, H + 30, W * 0.62, '#ff4a1a', 0.16 + 0.05 * Math.sin(c * 1.3), 160);
+      } else if (style === 'ionia') {
+        // Spirit lights wandering over the land
+        for (let i = 0; i < 6; i++) {
+          const x = W * (0.5 + 0.44 * Math.sin(c * 0.11 * (1 + i * 0.13) + i * 2.1)), y = H * (0.5 + 0.42 * Math.sin(c * 0.09 * (1 + i * 0.17) + i * 1.3));
+          drawGlow(g, x, y, 24 + Math.sin(c * 2 + i) * 4, i % 2 ? '#7ff0e0' : '#ffb8e0', 0.55);
+          drawGlow(g, x, y, 6, '#ffffff', 0.9);
+        }
+      }
       for (const p of this.projs) {
         const look = heroLook(p.tower.def.id, p.tower.def.role);
         if (look.shot === 'slash') continue;
@@ -1628,7 +1692,9 @@ export class Battle {
       g.globalAlpha = a;
       g.fillStyle = m.color;
       g.beginPath();
-      g.arc(m.x * 3, m.y * 3, m.blink ? 2.2 : 1.6, 0, Math.PI * 2);
+      // Petals tumble, snowflakes come in several sizes
+      if (style === 'ionia') g.ellipse(m.x * 3, m.y * 3, 3.4, 1.6, m.life * 2.2 + m.max, 0, Math.PI * 2);
+      else g.arc(m.x * 3, m.y * 3, m.blink ? 2.2 : 1.2 + (m.max % 3) * 0.5, 0, Math.PI * 2);
       g.fill();
     }
     g.globalAlpha = 1;
@@ -2041,6 +2107,20 @@ export class Battle {
     }
   }
 }
+
+/** Weather per map style: number of drifting motes, and what passes overhead (cloud shadow, smoke, snow squall). */
+interface Ambient { motes: number; rate: number; cloud: string; cloudA: number; wind: number }
+const AMBIENT_DEFAULT: Ambient = { motes: 50, rate: 0.2, cloud: '', cloudA: 0, wind: 0 };
+const AMBIENT: Partial<Record<MapDef['theme']['style'], Ambient>> = {
+  rift: { motes: 50, rate: 0.2, cloud: '#000000', cloudA: 0.16, wind: 14 },
+  jungle: { motes: 60, rate: 0.3, cloud: '#000000', cloudA: 0.2, wind: 10 },
+  demacia: { motes: 40, rate: 0.15, cloud: '#000000', cloudA: 0.12, wind: 16 },
+  tundra: { motes: 150, rate: 0.6, cloud: '#ffffff', cloudA: 0.16, wind: 46 },
+  bridge: { motes: 150, rate: 0.6, cloud: '#ffffff', cloudA: 0.14, wind: 46 },
+  noxus: { motes: 90, rate: 0.4, cloud: '#1a0606', cloudA: 0.26, wind: 9 },
+  ionia: { motes: 90, rate: 0.35, cloud: '#000000', cloudA: 0.1, wind: 12 },
+  haunted: { motes: 60, rate: 0.3, cloud: '#06201a', cloudA: 0.22, wind: 8 },
+};
 
 const LOOT_COLOR = ['', '#a09b8c', '#4a8fd8', '#c084fc', '#ffb347'];
 
