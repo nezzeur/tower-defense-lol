@@ -1964,7 +1964,7 @@ export class Battle {
 
   private drawEnemy(g: CanvasRenderingContext2D, e: Enemy): void {
     const d = e.def;
-    const fly = !!d.fly || d.id === 'drake' || d.id === 'fallenking' || d.id === 'spiritguard';
+    const fly = !!d.fly || d.id.startsWith('drake') || d.id === 'fallenking' || d.id === 'spiritguard';
     const epic = d.shape === 'boss';
     const h = (CREATURE_HEIGHT[d.id] ?? 16) * 3, w = h * 0.9;
     // Drawn where the last blow shoved it; the simulation keeps the true position

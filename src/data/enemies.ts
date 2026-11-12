@@ -11,31 +11,36 @@ export const ENEMIES: Record<string, EnemyDef> = {
   raptor: { id: 'raptor', name: 'Raptor', hp: 7, speed: 1.9, armor: 0, gold: 2, leak: 1, size: 7, color: '#d9534f', shape: 'circle' },
   krug: { id: 'krug', name: 'Krug', hp: 70, speed: 0.65, armor: 0.3, gold: 9, leak: 2, size: 12, color: '#8a7f73', shape: 'square' },
   gromp: { id: 'gromp', name: 'Gromp', hp: 110, speed: 0.75, armor: 0.1, gold: 14, leak: 3, size: 14, color: '#5fa86a', shape: 'square' },
-  drake: { id: 'drake', name: 'Drake infernal', hp: 250, speed: 0.7, armor: 0.15, gold: 40, leak: 5, size: 17, color: '#ff6b35', shape: 'boss' },
+  drake: { id: 'drake', name: 'Drake infernal', hp: 250, speed: 0.7, armor: 0.15, gold: 40, leak: 5, size: 17, color: '#ff6b35', shape: 'boss', fireproof: true },
   herald: { id: 'herald', name: 'Larve du Néant', hp: 400, speed: 0.6, armor: 0.15, gold: 60, leak: 5, size: 17, color: '#8e44ad', shape: 'boss' },
 
   // --- Regional troops (see REGION_ROSTER in game.ts) ---
   // Demacia: armour, shields and wings
-  dem_soldier: { id: 'dem_soldier', name: 'Soldat demacien', hp: 13, speed: 1.15, armor: 0.15, gold: 2, leak: 1, size: 9, color: '#3f6fc9', shape: 'circle' },
-  dem_knight: { id: 'dem_knight', name: "Chevalier d'argent", hp: 34, speed: 0.85, armor: 0.35, gold: 6, leak: 2, size: 12, color: '#eef1f5', shape: 'square', shield: 3 },
-  dem_hunter: { id: 'dem_hunter', name: 'Chasseur de mages', hp: 16, speed: 1.5, armor: 0, gold: 3, leak: 1, size: 9, color: '#5a6a7a', shape: 'circle', tenacity: 0.7 },
-  dem_wing: { id: 'dem_wing', name: "Aile d'argent", hp: 8, speed: 2, armor: 0, gold: 2, leak: 1, size: 8, color: '#dfe6f2', shape: 'diamond', fly: true },
+  dem_minion: { id: 'dem_minion', name: 'Sbire demacien', hp: 13, speed: 1.15, armor: 0.15, gold: 2, leak: 1, size: 9, color: '#3f6fc9', shape: 'circle' },
+  dem_golem: { id: 'dem_golem', name: 'Sentinelle de pétricite', hp: 34, speed: 0.85, armor: 0.35, gold: 6, leak: 2, size: 12, color: '#eef1f5', shape: 'square', shield: 3 },
+  dem_hound: { id: 'dem_hound', name: "Limier d'argent", hp: 16, speed: 1.5, armor: 0, gold: 3, leak: 1, size: 9, color: '#5a6a7a', shape: 'circle', tenacity: 0.7 },
+  dem_wing: { id: 'dem_wing', name: "Rapace d'argent", hp: 8, speed: 2, armor: 0, gold: 2, leak: 1, size: 8, color: '#dfe6f2', shape: 'diamond', fly: true },
   // Freljord: hardy, cold-blooded, hard to slow
-  frl_raider: { id: 'frl_raider', name: 'Pillard des glaces', hp: 14, speed: 1.2, armor: 0, gold: 2, leak: 1, size: 9, color: '#5d7f9e', shape: 'circle' },
+  frl_minion: { id: 'frl_minion', name: 'Sbire du Freljord', hp: 14, speed: 1.2, armor: 0, gold: 2, leak: 1, size: 9, color: '#5d7f9e', shape: 'circle' },
   frl_wolf: { id: 'frl_wolf', name: 'Loup des neiges', hp: 13, speed: 1.75, armor: 0, gold: 3, leak: 1, size: 9, color: '#eef4f8', shape: 'circle', tenacity: 1 },
   frl_troll: { id: 'frl_troll', name: 'Troll des glaces', hp: 75, speed: 0.65, armor: 0.1, gold: 9, leak: 2, size: 14, color: '#7fb0c9', shape: 'square', regen: 0.03 },
-  frl_witch: { id: 'frl_witch', name: 'Sorcière de givre', hp: 22, speed: 1, armor: 0, gold: 6, leak: 1, size: 9, color: '#9fe8ff', shape: 'circle', heal: { pct: 0.04, radius: 2.2 } },
+  frl_shaman: { id: 'frl_shaman', name: 'Chamane de givre', hp: 22, speed: 1, armor: 0, gold: 6, leak: 1, size: 9, color: '#9fe8ff', shape: 'circle', heal: { pct: 0.04, radius: 2.2 } },
   // Noxus: heavy armour, fire-hardened beasts, blood magic
-  nox_legion: { id: 'nox_legion', name: 'Légionnaire noxien', hp: 13, speed: 1.15, armor: 0.2, gold: 2, leak: 1, size: 9, color: '#8a1c26', shape: 'circle' },
+  nox_minion: { id: 'nox_minion', name: 'Sbire noxien', hp: 13, speed: 1.15, armor: 0.2, gold: 2, leak: 1, size: 9, color: '#8a1c26', shape: 'circle' },
   nox_hound: { id: 'nox_hound', name: 'Molosse drakéen', hp: 13, speed: 1.8, armor: 0, gold: 3, leak: 1, size: 9, color: '#4a2a2e', shape: 'circle', fireproof: true },
   nox_basilisk: { id: 'nox_basilisk', name: 'Basilic', hp: 80, speed: 0.6, armor: 0.45, gold: 10, leak: 2, size: 14, color: '#5f7a52', shape: 'square', tenacity: 0.5 },
   nox_mage: { id: 'nox_mage', name: 'Mage de sang', hp: 20, speed: 1, armor: 0, gold: 6, leak: 1, size: 9, color: '#ff3a3a', shape: 'circle', heal: { pct: 0.04, radius: 2.2 } },
   // Ionia: fast, evasive, spirits
-  ion_acolyte: { id: 'ion_acolyte', name: "Acolyte de l'Ordre", hp: 12, speed: 1.25, armor: 0, gold: 2, leak: 1, size: 9, color: '#3f9a8a', shape: 'circle' },
-  ion_ninja: { id: 'ion_ninja', name: 'Ombre du Kinkou', hp: 12, speed: 1.7, armor: 0, gold: 3, leak: 1, size: 9, color: '#4a3a6a', shape: 'circle', shield: 2 },
+  ion_minion: { id: 'ion_minion', name: 'Sbire ionien', hp: 12, speed: 1.25, armor: 0, gold: 2, leak: 1, size: 9, color: '#3f9a8a', shape: 'circle' },
+  ion_fox: { id: 'ion_fox', name: 'Esprit renard', hp: 12, speed: 1.7, armor: 0, gold: 3, leak: 1, size: 9, color: '#4a3a6a', shape: 'circle', shield: 2 },
   ion_crane: { id: 'ion_crane', name: 'Grue spirituelle', hp: 9, speed: 2.2, armor: 0, gold: 3, leak: 1, size: 8, color: '#ffd9ec', shape: 'diamond', fly: true },
-  ion_oni: { id: 'ion_oni', name: 'Oni', hp: 70, speed: 0.65, armor: 0.2, gold: 9, leak: 2, size: 14, color: '#b84a5a', shape: 'square', split: { id: 'ion_wisp', n: 3 } },
+  ion_treant: { id: 'ion_treant', name: 'Gardien sylvestre', hp: 70, speed: 0.65, armor: 0.2, gold: 9, leak: 2, size: 14, color: '#b84a5a', shape: 'square', split: { id: 'ion_wisp', n: 3 } },
   ion_wisp: { id: 'ion_wisp', name: 'Feu follet', hp: 5, speed: 2, armor: 0, gold: 1, leak: 1, size: 6, color: '#7ff0e0', shape: 'diamond' },
+
+  // Elemental drakes: each region's epic monster (every 10 waves)
+  drake_mountain: { id: 'drake_mountain', name: 'Drake des montagnes', hp: 300, speed: 0.65, armor: 0.4, gold: 45, leak: 5, size: 17, color: '#9a8a72', shape: 'boss' },
+  drake_ocean: { id: 'drake_ocean', name: 'Drake des océans', hp: 270, speed: 0.7, armor: 0.15, gold: 45, leak: 5, size: 17, color: '#3f9fc9', shape: 'boss', regen: 0.02 },
+  drake_cloud: { id: 'drake_cloud', name: 'Drake des nuages', hp: 210, speed: 1, armor: 0.1, gold: 45, leak: 5, size: 17, color: '#cfd8e6', shape: 'boss', fly: true },
 
   // Final bosses: reaching the nexus costs 12 lives and they walk the lane again.
   riftherald: { id: 'riftherald', name: 'Héraut de la Faille', hp: 900, speed: 0.45, armor: 0.2, gold: 200, leak: 12, size: 22, color: '#7d3cff', boss: true, shape: 'boss' },

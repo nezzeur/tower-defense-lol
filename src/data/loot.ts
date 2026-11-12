@@ -7,10 +7,10 @@ export const MAT_RARITY = ['', 'Commun', 'Rare', 'Épique', 'Légendaire'];
 export const MATERIALS: MaterialDef[] = [
   // Dropped everywhere, by monster family
   { id: 'essence', name: 'Essence bleue', icon: '🔹', rarity: 1, from: ['any'], desc: 'Tous les monstres.' },
-  { id: 'croc', name: 'Croc acéré', icon: '🦷', rarity: 1, from: ['wolf', 'raptor', 'frl_wolf', 'nox_hound', 'dem_hunter', 'ion_ninja'], desc: 'Loups, raptors, molosses et chasseurs.' },
-  { id: 'krug', name: 'Éclat de krug', icon: '🪨', rarity: 1, from: ['krug', 'gromp', 'frl_troll', 'nox_basilisk', 'ion_oni', 'dem_knight'], desc: 'Krugs, gromps et gros monstres des régions.' },
+  { id: 'croc', name: 'Croc acéré', icon: '🦷', rarity: 1, from: ['wolf', 'raptor', 'frl_wolf', 'nox_hound', 'dem_hound', 'ion_fox'], desc: 'Loups, raptors, molosses et chasseurs.' },
+  { id: 'krug', name: 'Éclat de krug', icon: '🪨', rarity: 1, from: ['krug', 'gromp', 'frl_troll', 'nox_basilisk', 'ion_treant', 'dem_golem'], desc: 'Krugs, gromps et gros monstres des régions.' },
   { id: 'carapace', name: 'Carapace de carapateur', icon: '🦀', rarity: 1, from: ['scuttle', 'ion_crane', 'dem_wing'], desc: 'Carapateurs et volants (vagues 5, 15, 25…).' },
-  { id: 'ecaille', name: 'Écaille de drake', icon: '🐉', rarity: 3, from: ['drake', 'herald'], desc: 'Monstres épiques (toutes les 10 vagues).' },
+  { id: 'ecaille', name: 'Écaille de drake', icon: '🐉', rarity: 3, from: ['drake', 'herald', 'drake_mountain', 'drake_ocean', 'drake_cloud'], desc: 'Monstres épiques (toutes les 10 vagues).' },
   { id: 'nexus', name: 'Fragment de Nexus', icon: '💠', rarity: 4, from: ['boss'], desc: 'Boss finaux uniquement.' },
   // Regional: any monster on a map of that region
   { id: 'herbe', name: 'Herbe de la Faille', icon: '🌿', rarity: 1, region: 'rift', desc: 'Faille de l\'invocateur.' },
@@ -36,7 +36,7 @@ export const MAT_BY_ID: Record<string, MaterialDef> = Object.fromEntries(MATERIA
 export function lootRolls(e: EnemyDef): number {
   if (e.boss) return 50;
   if (e.shape === 'boss') return 25;
-  return { cannon: 2, scuttle: 2, super: 3, krug: 3, gromp: 4, dem_knight: 2, frl_troll: 3, nox_basilisk: 3, ion_oni: 3, frl_witch: 2, nox_mage: 2 }[e.id] ?? 1;
+  return { cannon: 2, scuttle: 2, super: 3, krug: 3, gromp: 4, dem_golem: 2, frl_troll: 3, nox_basilisk: 3, ion_treant: 3, frl_shaman: 2, nox_mage: 2 }[e.id] ?? 1;
 }
 
 /** Materials this monster can drop on a map of the given region. */

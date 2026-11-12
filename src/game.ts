@@ -90,14 +90,16 @@ interface Roster {
   pack: string; swarm: string; heavy: string; brute: string; runner: string;
   /** Region specialists (healers...): two of them every 4 waves from wave 5. */
   support?: string;
+  /** Epic monster every 10 waves (a Void grub replaces it every 20). */
+  epic: string;
 }
-const RIFT_ROSTER: Roster = { basic: 'melee', ranged: 'caster', tank: 'cannon', elite: 'super', pack: 'wolf', swarm: 'raptor', heavy: 'krug', brute: 'gromp', runner: 'scuttle' };
+const RIFT_ROSTER: Roster = { basic: 'melee', ranged: 'caster', tank: 'cannon', elite: 'super', pack: 'wolf', swarm: 'raptor', heavy: 'krug', brute: 'gromp', runner: 'scuttle', epic: 'drake' };
 export const REGION_ROSTER: Record<string, Roster> = {
   rift: RIFT_ROSTER,
-  demacia: { ...RIFT_ROSTER, basic: 'dem_soldier', tank: 'dem_knight', pack: 'dem_hunter', swarm: 'dem_wing' },
-  freljord: { ...RIFT_ROSTER, basic: 'frl_raider', pack: 'frl_wolf', heavy: 'frl_troll', support: 'frl_witch' },
-  noxus: { ...RIFT_ROSTER, basic: 'nox_legion', pack: 'nox_hound', heavy: 'nox_basilisk', support: 'nox_mage' },
-  ionia: { ...RIFT_ROSTER, basic: 'ion_acolyte', pack: 'ion_ninja', swarm: 'ion_wisp', heavy: 'ion_oni', runner: 'ion_crane' },
+  demacia: { ...RIFT_ROSTER, basic: 'dem_minion', tank: 'dem_golem', pack: 'dem_hound', swarm: 'dem_wing', epic: 'drake_mountain' },
+  freljord: { ...RIFT_ROSTER, basic: 'frl_minion', pack: 'frl_wolf', heavy: 'frl_troll', support: 'frl_shaman', epic: 'drake_ocean' },
+  noxus: { ...RIFT_ROSTER, basic: 'nox_minion', pack: 'nox_hound', heavy: 'nox_basilisk', support: 'nox_mage' },
+  ionia: { ...RIFT_ROSTER, basic: 'ion_minion', pack: 'ion_fox', swarm: 'ion_wisp', heavy: 'ion_treant', runner: 'ion_crane', epic: 'drake_cloud' },
 };
 
 export function buildWave(m: MapDef, w: number): Spawn[] {
@@ -123,7 +125,7 @@ export function buildWave(m: MapDef, w: number): Spawn[] {
   if (w >= 6 && w % 6 === 0) for (let i = 0; i < 2; i++) out.push({ id: ro.heavy, delay: i ? 0.8 : 1.2 });
   if (w >= 7 && w % 7 === 0) out.push({ id: ro.brute, delay: 1.2 });
   if (w % 5 === 0 && w % 10 !== 0) for (let i = 0; i < 6; i++) out.push({ id: ro.runner, delay: 0.3 });
-  if (w % 10 === 0) out.push({ id: w % 20 === 0 ? 'herald' : 'drake', delay: 1.2 });
+  if (w % 10 === 0) out.push({ id: w % 20 === 0 ? 'herald' : ro.epic, delay: 1.2 });
   return out;
 }
 
