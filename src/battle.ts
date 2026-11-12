@@ -115,10 +115,13 @@ interface Proj {
   /** Pixels per second, and distance to the target when it was fired (for lobbed arcs). */
   speed: number;
   d0: number;
+  /** Bounce shots: where this hop started (a bolt of energy links it to the projectile). */
+  ox?: number;
+  oy?: number;
 }
 
 interface Fx {
-  kind: 'beam' | 'ring' | 'text' | 'boom';
+  kind: 'beam' | 'ring' | 'text' | 'boom' | 'laser' | 'zap' | 'whirl' | 'storm';
   x: number;
   y: number;
   x2?: number;
@@ -936,7 +939,7 @@ export class Battle {
           break;
         case 'aura':
           for (const e of targets) this.hit(t, e, 1);
-          this.fx.push({ kind: 'ring', x: t.x, y: t.y, r: s.range * TILE, t: 0, max: 0.35, color: t.def.color });
+          if (this.vfx) this.auraFx(t, s.range * TILE);
           break;
         case 'pierce': {
           const len = s.range * TILE * 1.15;
@@ -944,8 +947,7 @@ export class Battle {
           for (const e of this.enemies) {
             if (!e.dead && distToSeg(e.x, e.y, t.x, t.y, x2, y2) < TILE * 0.45 + e.def.size) this.hit(t, e, 1);
           }
-          this.fx.push({ kind: 'beam', x: t.x + Math.cos(t.angle) * 16, y: t.y - 10 + Math.sin(t.angle) * 12, x2, y2, t: 0, max: 0.2, color: t.def.color });
-          this.vfx?.light((t.x + x2) / 2, (t.y + y2) / 2, len * 0.6, t.def.color, 0.4, 0.2);
+          if (this.vfx) this.laserFx(t, x2, y2, len);
           break;
         }
       }
@@ -973,6 +975,11 @@ export class Battle {
       if (d < speed * dt + 4) {
         p.x = p.target.x;
         p.y = p.target.y;
+        if (this.vfx && p.ox !== undefined) {
+          // The bolt of a bounce lingers for an instant after it lands
+          const look = heroLook(p.tower.def.id, p.tower.def.role);
+          this.fx.push({ kind: 'zap', x: p.ox, y: p.oy! - 8, x2: p.x, y2: p.y - 8, t: 0, max: 0.16, color: lightColor(look.element, p.tower.def.color) });
+        }
         this.impact(p);
         p.chainLeft = -1;
       } else {
@@ -1001,7 +1008,7 @@ export class Battle {
       if (next) {
         this.projs.push({
           x: p.x, y: p.y, target: next, tower: t, dmgMult: p.dmgMult * 0.8, chainLeft: p.chainLeft - 1, hit: p.hit, trail: [],
-          speed: p.speed, d0: Math.hypot(next.x - p.x, next.y - p.y),
+          speed: p.speed, d0: Math.hypot(next.x - p.x, next.y - p.y), ox: p.x, oy: p.y,
         });
       }
     }
@@ -1035,6 +1042,38 @@ export class Battle {
       store.data.gold += g;
       this.runGold += g;
       this.fx.push({ kind: 'text', x: e.x, y: e.y - 20, t: 0, max: 0.7, color: '#f5c542', text: `+${g}` });
+    }
+  }
+
+  /** Piercing ray: a real laser from the weapon, with sparks along its path and a flare where it ends. */
+  private laserFx(t: Tower, x2: number, y2: number, len: number): void {
+    const v = this.vfx!, col = t.def.color;
+    const x1 = t.x + Math.cos(t.angle) * 16, y1 = t.y - 10 + Math.sin(t.angle) * 12;
+    this.fx.push({ kind: 'laser', x: x1, y: y1, x2, y2, t: 0, max: 0.3, color: col });
+    for (let i = 0; i < 9; i++) {
+      const u = Math.random();
+      v.embers(x1 + (x2 - x1) * u, y1 + (y2 - y1) * u, 1, col, '#ffffff', 5);
+    }
+    v.sparks(x2, y2, t.angle, 1.6, 6, 180, '#ffffff', 1.5, y2 + 16);
+    v.sparks(x1, y1, t.angle, 0.9, 4, 160, col, 1.5, y1 + 24);
+    v.light(x1, y1, 46, col, 0.7, 0.2);
+    v.light((x1 + x2) / 2, (y1 + y2) / 2, len * 0.6, col, 0.45, 0.24);
+    v.light(x2, y2, 40, col, 0.55, 0.2);
+  }
+
+  /** Aura attack: a blizzard swirling around ice champions, a whirl of blades around the others. */
+  private auraFx(t: Tower, r: number): void {
+    const v = this.vfx!, ice = heroLook(t.def.id, t.def.role).element === 'ice';
+    this.fx.push({ kind: ice ? 'storm' : 'whirl', x: t.x, y: t.y - 4, r, t: 0, max: ice ? 0.75 : 0.42, color: t.def.color });
+    if (ice) {
+      for (let i = 0; i < 7; i++) {
+        const a = Math.random() * 6.283, d = r * (0.25 + Math.random() * 0.75);
+        v.embers(t.x + Math.cos(a) * d, t.y - 4 + Math.sin(a) * d, 1, '#e8f7ff', '#8fd3ff', 3);
+      }
+      v.light(t.x, t.y, r * 1.2, '#8fd3ff', 0.3, 0.4);
+    } else {
+      v.sparks(t.x, t.y - 6, 0, 6.283, 5, r * 3, '#ffffff', 1.4, t.y + 14);
+      v.light(t.x, t.y, r * 1.1, t.def.color, 0.35, 0.2);
     }
   }
 
@@ -1332,6 +1371,7 @@ export class Battle {
         g.stroke();
         g.globalAlpha = 1;
       }
+      if (p.ox !== undefined) bolt(g, p.ox, p.oy! - 8, p.x, p.y - 8, lightColor(look.element, col), 1);
       const pose = this.shotPose(p, look.shot);
       drawShot(g, look, col, p.x, p.y, pose.ang, this.clock, pose.lift);
     }
@@ -1366,6 +1406,102 @@ export class Battle {
         g.globalAlpha = k;
         g.lineWidth = 2.6 * k + 0.8;
         g.stroke();
+      } else if (f.kind === 'zap') {
+        bolt(g, f.x, f.y, f.x2!, f.y2!, f.color, k);
+      } else if (f.kind === 'laser') {
+        // Flares up in a few frames, then thins out
+        const u = 1 - k, wdt = u < 0.18 ? 0.35 + (u / 0.18) * 0.65 : k / 0.82;
+        const dx = f.x2! - f.x, dy = f.y2! - f.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+        g.globalCompositeOperation = 'lighter';
+        g.strokeStyle = f.color;
+        g.globalAlpha = 0.22 * wdt;
+        g.lineWidth = 26 * wdt;
+        seg(g, f.x, f.y, f.x2!, f.y2!);
+        g.globalAlpha = 0.5 * wdt;
+        g.lineWidth = 11 * wdt;
+        seg(g, f.x, f.y, f.x2!, f.y2!);
+        // Two strands of light twisting around the ray
+        g.lineWidth = 1.6;
+        g.globalAlpha = 0.8 * wdt;
+        for (const sgn of [1, -1]) {
+          g.beginPath();
+          for (let i = 0; i <= 48; i++) {
+            const q = i / 48, o = Math.sin(q * 20 - this.clock * 34) * sgn * (3 + 5 * wdt) * Math.sin(q * Math.PI);
+            g.lineTo(f.x + dx * q + nx * o, f.y + dy * q + ny * o);
+          }
+          g.stroke();
+        }
+        g.globalCompositeOperation = 'source-over';
+        g.strokeStyle = '#ffffff';
+        g.globalAlpha = Math.min(1, wdt * 1.3);
+        g.lineWidth = 4 * wdt + 0.8;
+        seg(g, f.x, f.y, f.x2!, f.y2!);
+        g.globalCompositeOperation = 'lighter';
+        drawGlow(g, f.x, f.y, 8 + 9 * wdt, '#ffffff', wdt);
+        drawGlow(g, f.x, f.y, 18 + 12 * wdt, f.color, wdt * 0.7);
+        drawGlow(g, f.x2!, f.y2!, 20 + 16 * wdt, f.color, wdt * 0.8);
+        g.globalCompositeOperation = 'source-over';
+      } else if (f.kind === 'whirl') {
+        // Blades sweeping a full turn: bright leading edge, fading wake
+        const u = 1 - k, spin = u * 7.2 + f.x * 0.01, R = f.r!;
+        g.globalCompositeOperation = 'lighter';
+        drawGlow(g, f.x, f.y, R * 1.05, f.color, 0.16 * k);
+        g.lineCap = 'round';
+        for (let b = 0; b < 2; b++) {
+          const lead = spin + b * Math.PI;
+          // Wake: slices that thin out and fade behind the blade
+          g.globalCompositeOperation = 'source-over';
+          g.lineCap = 'butt';
+          g.strokeStyle = f.color;
+          for (let j = 0; j < 14; j++) {
+            const q = 1 - j / 14;
+            g.globalAlpha = k * q * q * 0.8;
+            g.lineWidth = 3 + 10 * q;
+            g.beginPath();
+            g.arc(f.x, f.y, R * 0.88, lead - (j + 1) * 0.13 - 0.01, lead - j * 0.13);
+            g.stroke();
+          }
+          g.globalCompositeOperation = 'lighter';
+          g.lineCap = 'round';
+          g.strokeStyle = '#ffffff';
+          g.globalAlpha = k;
+          g.lineWidth = 3.5;
+          g.beginPath();
+          g.arc(f.x, f.y, R * 0.93, lead - 0.5, lead);
+          g.stroke();
+          g.globalAlpha = k * 0.55;
+          g.lineWidth = 1.8;
+          g.beginPath();
+          g.arc(f.x, f.y, R * 0.55, lead + 0.4, lead + 1.6);
+          g.stroke();
+          drawGlow(g, f.x + Math.cos(lead) * R * 0.93, f.y + Math.sin(lead) * R * 0.93, 12, '#ffffff', k);
+        }
+        g.globalCompositeOperation = 'source-over';
+      } else if (f.kind === 'storm') {
+        // Blizzard: frost haze with streaks of wind circling at different speeds
+        const u = 1 - k, R = f.r!, a = Math.sin(Math.PI * Math.min(1, u * 1.15)) ;
+        drawGlow(g, f.x, f.y, R * 1.1, '#d8f1ff', 0.3 * a);
+        g.globalCompositeOperation = 'lighter';
+        g.lineCap = 'round';
+        for (let i = 0; i < 7; i++) {
+          const rr = R * (0.28 + i * 0.115), sp = (i % 2 ? 1 : -0.7) * (3.2 + i * 0.5), a0 = i * 2.4 + this.clock * sp;
+          g.strokeStyle = i % 3 ? '#e8f7ff' : '#8fd3ff';
+          g.globalAlpha = a * (0.55 - i * 0.04);
+          g.lineWidth = 2.6 - i * 0.2;
+          g.beginPath();
+          g.arc(f.x, f.y, rr, a0, a0 + 1.5);
+          g.stroke();
+          g.beginPath();
+          g.arc(f.x, f.y, rr, a0 + Math.PI, a0 + Math.PI + 1.1);
+          g.stroke();
+        }
+        g.globalAlpha = a * 0.7;
+        g.strokeStyle = '#ffffff';
+        g.lineWidth = 1.5;
+        g.beginPath();
+        g.arc(f.x, f.y, R * (0.6 + 0.4 * u), 0, Math.PI * 2);
+        g.stroke();
+        g.globalCompositeOperation = 'source-over';
       } else {
         // Blast: fireball that swells fast then fades, with a shockwave racing ahead of it
         const u = 1 - k, rr = f.r! * (0.35 + 0.65 * (1 - (1 - u) ** 3));
@@ -1772,6 +1908,35 @@ export class Battle {
 }
 
 const LOOT_COLOR = ['', '#a09b8c', '#4a8fd8', '#c084fc', '#ffb347'];
+
+/** Jagged bolt of energy between two points; it is redrawn with new kinks every frame, so it crackles. */
+function bolt(g: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color: string, k: number): void {
+  const dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy);
+  if (d < 2) return;
+  const n = Math.max(2, Math.round(d / 12)), nx = -dy / d, ny = dx / d;
+  const pts: number[] = [x1, y1];
+  for (let i = 1; i < n; i++) {
+    const q = i / n, o = (Math.random() - 0.5) * 16 * Math.sin(q * Math.PI);
+    pts.push(x1 + dx * q + nx * o, y1 + dy * q + ny * o);
+  }
+  pts.push(x2, y2);
+  const path = () => { g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); g.stroke(); };
+  g.lineJoin = 'round';
+  g.globalCompositeOperation = 'lighter';
+  g.strokeStyle = color;
+  g.globalAlpha = 0.35 * k;
+  g.lineWidth = 9;
+  path();
+  g.globalAlpha = 0.8 * k;
+  g.lineWidth = 3.5;
+  path();
+  g.globalCompositeOperation = 'source-over';
+  g.strokeStyle = '#ffffff';
+  g.globalAlpha = k;
+  g.lineWidth = 1.4;
+  path();
+  g.globalAlpha = 1;
+}
 
 function seg(g: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number): void {
   g.beginPath();
