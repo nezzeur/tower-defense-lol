@@ -63,7 +63,6 @@ export function startBattle(mapId: string): void {
   ui.battle = new Battle(map, { onChange: renderSide, onEnd: showResult });
   setMusic(map.region ?? 'rift');
   document.getElementById('board')!.prepend(ui.battle.canvas);
-  if (store.data.auto) ui.battle.startWave();
   renderSide();
   clearInterval(ui.tick);
   ui.tick = window.setInterval(refreshLive, 150);
@@ -356,7 +355,7 @@ export function refreshLive(): void {
     el.classList.toggle('hidden', (m === 'boss' && !canBoss) || (m === 'endless' && !canEndless));
   });
   set('b-hint', !b.towers.length ? 'Place au moins un champion avant de lancer la vague.'
-    : store.data.auto ? 'Mode auto : vagues et redémarrages automatiques.' : '');
+    : store.data.auto ? (b.wave === 0 && !b.waveActive ? 'Vagues auto : choisis ton mode puis lance la première vague, la suite s\'enchaîne.' : 'Mode auto : vagues et redémarrages automatiques.') : '');
 }
 
 function showResult(win: boolean, wave: number): void {

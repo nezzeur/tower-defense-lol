@@ -175,4 +175,5 @@
 .nw-traits { position: absolute; left: 0; right: 0; bottom: -13px; text-align: center; font-style: normal; font-size: 10px; line-height: 1; white-space: nowrap; }
 .next-wave { row-gap: 16px; padding-bottom: 12px; }
 
-.modes { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; justify-content: flex-end; }
+.modes { display: flex; gap: 6px; align-items: center; justify-content: flex-end; padding: 6px 8px; background: var(--bg2); border: 1px solid var(--gold3); }
+.modes > span { font: 700 11px var(--font-head); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold2); margin-right: 4px; }

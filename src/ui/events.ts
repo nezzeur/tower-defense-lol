@@ -166,7 +166,8 @@ app.addEventListener('change', (e) => {
   if (el.id === 'b-auto') {
     store.data.auto = (el as HTMLInputElement).checked;
     persist();
-    if (store.data.auto && ui.battle && !ui.battle.waveActive && ui.battle.towers.length) {
+    // Ticking the box mid-run resumes at once; before the first wave the player still launches it (mode choice)
+    if (store.data.auto && ui.battle && !ui.battle.waveActive && ui.battle.towers.length && (ui.battle.wave > 0 || ui.battle.over)) {
       if (ui.battle.over) ui.battle.restart(); else ui.battle.startWave();
     }
     refreshLive();
