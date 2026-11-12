@@ -37,6 +37,11 @@ function getCtx(): AudioContext | null {
   return ctx;
 }
 
+/** Shared AudioContext (created on first use, resumed after a user gesture); null without a browser. */
+export function audioContext(): AudioContext | null {
+  return getCtx();
+}
+
 /** Re-applies volume/mute from the save to the master gain. */
 export function applyVolume(): void {
   if (ctx && master) master.gain.setTargetAtTime(level() * 0.6, ctx.currentTime, 0.02);

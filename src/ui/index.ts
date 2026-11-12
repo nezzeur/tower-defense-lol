@@ -8,6 +8,7 @@ import { optionsScreen } from './options';
 import { shopScreen } from './shop';
 import { renderStarter } from './starter';
 import './events';
+import { setMusic } from '../music';
 
 export { statLines } from './common';
 
@@ -32,5 +33,8 @@ export function render(): void {
 
 export function go(s: Screen): void {
   ui.screen = s;
+  if (s !== 'battle') setMusic('menu');
   render();
 }
+
+setMusic('menu');

@@ -11,6 +11,7 @@ import { MAP_BY_ID } from '../data/maps';
 import { REGIONS } from '../art/worldArt';
 import { champ, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots } from '../game';
 import { sfx } from '../audio';
+import { setMusic, setMusicIntensity } from '../music';
 import { persist, store } from '../save';
 import type { MapDef } from '../types';
 import { app, esc, itemSelect, abilityRow, levelButtons, mapThumb, portrait, starRow, statLines, ui, ultButton } from './common';
@@ -55,6 +56,7 @@ export function startBattle(mapId: string): void {
   </div>`;
 
   ui.battle = new Battle(map, { onChange: renderSide, onEnd: showResult });
+  setMusic(map.region ?? 'rift');
   document.getElementById('board')!.prepend(ui.battle.canvas);
   if (store.data.auto) ui.battle.startWave();
   renderSide();
@@ -319,6 +321,8 @@ export function refreshLive(): void {
   const card = document.getElementById('enemy-card');
   if (!!card !== !!b.selectedEnemy) return renderSide();
   if (card && b.selectedEnemy) setHtml(card, enemyCard(b, b.selectedEnemy));
+  // Music follows the fight: calm between waves, driving during one, heavier on epic and boss waves
+  setMusicIntensity(!b.waveActive || b.over ? 0 : b.wave === b.map.waves || b.wave % 10 === 0 ? 2 : 1);
   set('b-wave', String(b.wave));
   set('b-lives', String(Math.max(0, b.lives)));
   for (const id of Object.keys(SPELLS) as SpellId[]) {

@@ -3,6 +3,7 @@ import { ITEM_BY_ID } from '../data/items';
 import { champ, claimChest, craftItem, openChest, level, teamSlots, tryLevelUp, ULT_LEVELS, ultRank } from '../game';
 import { playChestOpening } from '../art/chest';
 import { applyVolume, sfx } from '../audio';
+import { applyMusicVolume } from '../music';
 import type { SpellId } from '../battle';
 import type { Priority } from '../types';
 import { exportSave, importSave, persist, resetSave, store } from '../save';
@@ -30,7 +31,7 @@ app.addEventListener('click', (e) => {
   if (!el || (el as HTMLButtonElement).disabled) return;
   const d = el.dataset;
   sfx('click');
-  if (d.mute !== undefined) { store.data.muted = !store.data.muted; persist(); applyVolume(); return render(); }
+  if (d.mute !== undefined) { store.data.muted = !store.data.muted; persist(); applyVolume(); applyMusicVolume(); return render(); }
   if (d.nav) return go(d.nav as Screen);
   if (d.starter) {
     store.data.owned.push(d.starter);
@@ -141,10 +142,19 @@ app.addEventListener('click', (e) => {
 
 app.addEventListener('input', (e) => {
   const el = e.target as HTMLInputElement;
+  if (el.id === 'opt-music') {
+    store.data.music = Number(el.value) / 100;
+    applyMusicVolume();
+    persist();
+    const lab = document.getElementById('opt-music-val');
+    if (lab) lab.textContent = `${Math.round(store.data.music * 100)} %`;
+    return;
+  }
   if (el.id !== 'opt-volume') return;
   store.data.volume = Number(el.value) / 100;
   if (store.data.volume > 0) store.data.muted = false;
   applyVolume();
+  applyMusicVolume();
   persist();
   const out = document.getElementById('opt-volume-val');
   if (out) out.textContent = `${Math.round(store.data.volume * 100)} %`;

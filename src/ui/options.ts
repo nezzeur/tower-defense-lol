@@ -8,6 +8,10 @@ export function optionsScreen(): string {
       <div class="row"><button class="btn" data-mute>${d.muted ? 'Son coupé' : 'Son activé'}</button>
         <input type="range" id="opt-volume" min="0" max="100" step="1" value="${Math.round(d.volume * 100)}" aria-label="Volume">
         <span id="opt-volume-val" class="small">${Math.round(d.volume * 100)} %</span></div>
+      <div class="row"><span class="small" style="min-width:86px">Musique</span>
+        <input type="range" id="opt-music" min="0" max="100" step="1" value="${Math.round(d.music * 100)}" aria-label="Volume de la musique">
+        <span id="opt-music-val" class="small">${Math.round(d.music * 100)} %</span></div>
+      <p class="muted small">Musique et ambiance générées en direct, un thème par région. Le premier curseur règle les bruitages.</p>
     </section>
     <section class="card"><h3>Affichage</h3>
       <label class="auto"><input type="checkbox" id="opt-lowfx" ${d.lowFx ? 'checked' : ''}> Effets réduits</label>

@@ -36,6 +36,8 @@ export interface SaveData {
   /** Master volume 0-1. */
   volume: number;
   muted: boolean;
+  /** Music volume 0-1. */
+  music: number;
 }
 
 // ?save=<name> uses a separate save slot (testing without touching real progress).
@@ -45,7 +47,7 @@ const KEY = 'riftdefenders.save.v1' + (slot ? `:${slot}` : '');
 function fresh(): SaveData {
   return {
     v: 1, gold: 0, owned: [], levels: {}, stacks: {}, items: [], mats: {}, equip: {}, best: {}, layouts: {}, priorities: {},
-    chestsOpened: 0, chestOffer: null, chestsSinceEpic: 0, speed: 1, auto: false, autoUlt: false, lowFx: false, kills: 0, runs: 0, volume: 0.5, muted: false,
+    chestsOpened: 0, chestOffer: null, chestsSinceEpic: 0, speed: 1, auto: false, autoUlt: false, lowFx: false, kills: 0, runs: 0, volume: 0.5, muted: false, music: 0.35,
   };
 }
 
@@ -64,6 +66,7 @@ function sanitize(raw: unknown): SaveData {
   if (d.v !== 1 || !Array.isArray(d.owned) || typeof d.gold !== 'number') throw new Error('bad save');
   if (typeof d.volume !== 'number' || !(d.volume >= 0 && d.volume <= 1)) d.volume = 0.5;
   d.muted = d.muted === true;
+  if (typeof d.music !== 'number' || !(d.music >= 0 && d.music <= 1)) d.music = 0.35;
   if (!d.mats || typeof d.mats !== 'object' || Array.isArray(d.mats)) d.mats = {};
   d.autoUlt = d.autoUlt === true;
   d.lowFx = d.lowFx === true;
@@ -132,7 +135,7 @@ export function importSave(code: string): void {
 
 export function resetSave(): void {
   // Progress is wiped; device preferences (sound, game speed) are kept.
-  const { volume, muted, speed, autoUlt, lowFx } = store.data;
-  store.data = { ...fresh(), volume, muted, speed, autoUlt, lowFx };
+  const { volume, muted, music, speed, autoUlt, lowFx } = store.data;
+  store.data = { ...fresh(), volume, muted, music, speed, autoUlt, lowFx };
   persist();
 }
