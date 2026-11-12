@@ -41,6 +41,19 @@ export function squareImage(id: string): HTMLImageElement | null {
   return img.complete && img.naturalWidth > 0 ? img : null;
 }
 
+const splashes = new Map<string, HTMLImageElement>();
+
+/** Wide splash art for canvas drawing (ultimate cut-in); null until loaded. */
+export function splashImage(id: string): HTMLImageElement | null {
+  let img = splashes.get(id);
+  if (!img) {
+    img = new Image();
+    img.src = splashUrl(id);
+    splashes.set(id, img);
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
+
 export interface AbilityIcons { passive: string; ult: string; passiveName: string; ultName: string }
 const abilities = new Map<string, AbilityIcons | 'loading' | 'error'>();
 

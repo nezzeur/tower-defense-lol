@@ -1,5 +1,5 @@
 import { mobImage } from './art/mobArt';
-import { squareImage } from './art/champArt';
+import { splashImage, squareImage } from './art/champArt';
 import { FEATURE_INFO, featureTiles, landmarkTiles, LH, LW, pathGeometry, spawnMote, terrainAt, type Mote } from './art/mapArt';
 import { drawMapHD } from './art/mapHD';
 import { CREATURE_HEIGHT, drawCreature } from './art/creatures';
@@ -25,6 +25,8 @@ export const H = ROWS * TILE;
 const STEP = 1 / 60;
 /** Seconds a champion takes to drop onto its tile, and the moment its feet touch the ground. */
 const SPAWN = 0.38, LAND = SPAWN * 0.7;
+/** Seconds the ultimate cut-in stays on screen. */
+const CUTIN = 1.15;
 
 interface Burn { dps: number; t: number; src: Tower | null }
 
@@ -121,7 +123,7 @@ interface Proj {
 }
 
 interface Fx {
-  kind: 'beam' | 'ring' | 'text' | 'boom' | 'laser' | 'zap' | 'whirl' | 'storm';
+  kind: 'beam' | 'ring' | 'text' | 'boom' | 'laser' | 'zap' | 'whirl' | 'storm' | 'strike' | 'pillar';
   x: number;
   y: number;
   x2?: number;
@@ -213,6 +215,8 @@ export class Battle {
   private shake = 0;
   private nexusHurt = 0;
   private banner: { text: string; sub: string; t: number; color: string } | null = null;
+  /** Ultimate cut-in: a band with the champion's art that sweeps across the top of the board. */
+  private cutin: { id: string; name: string; champ: string; color: string; t: number } | null = null;
   private readonly visual: boolean;
 
   /** headless: no canvas, input or animation loop; drive it with step() (balance simulation). */
@@ -647,12 +651,24 @@ export class Battle {
       const g = Math.max(1, Math.round(waveBonus(this.map, Math.max(1, this.wave)) * fx.mult));
       store.data.gold += g;
       this.runGold += g;
-      if (vis) this.fx.push({ kind: 'text', x: t.x, y: t.y - 36, t: 0, max: 1, color: '#f5c542', text: `+${fmtShort(g)}` });
+      if (vis) {
+        this.fx.push({ kind: 'text', x: t.x, y: t.y - 40, t: 0, max: 1.2, color: '#f5c542', text: `+${fmtShort(g)}`, size: 20 });
+        this.fx.push({ kind: 'pillar', x: t.x, y: t.y + 12, t: 0, max: 0.9, color: '#f5c542' });
+        this.vfx!.coins(t.x, t.y - 30, 26, t.y + 14);
+        this.vfx!.sparks(t.x, t.y - 20, -Math.PI / 2, 2.4, 14, 260, '#fff3b0', 1.6, t.y + 14);
+      }
     } else if (fx.kind === 'lives') {
       if (this.lives >= MAX_LIVES) return false;
       this.lives = Math.min(MAX_LIVES, this.lives + fx.n);
       const end = this.pts[this.pts.length - 1];
-      if (vis) this.fx.push({ kind: 'ring', x: end.x, y: end.y, r: 70, t: 0, max: 0.9, color: '#6be08a' });
+      if (vis) {
+        this.fx.push({ kind: 'ring', x: end.x, y: end.y, r: 70, t: 0, max: 0.9, color: '#6be08a' });
+        this.fx.push({ kind: 'pillar', x: end.x, y: end.y + 14, t: 0, max: 1.1, color: '#6be08a' });
+        this.fx.push({ kind: 'pillar', x: t.x, y: t.y + 12, t: 0, max: 0.8, color: '#6be08a' });
+        this.fx.push({ kind: 'text', x: end.x, y: end.y - 50, t: 0, max: 1.2, color: '#6be08a', text: `+${fx.n} ♥`, size: 20 });
+        this.vfx!.embers(end.x, end.y - 10, 18, '#6be08a', '#ffffff', 22);
+        this.vfx!.light(end.x, end.y, 150, '#6be08a', 0.7, 0.7);
+      }
     } else if (!alive.length) {
       return false;
     } else if (fx.kind === 'burst') {
@@ -667,6 +683,14 @@ export class Battle {
         this.fx.push({ kind: 'ring', x: c.x, y: c.y, r: r * 1.3, t: 0, max: 0.7, color: '#ffffff' });
         this.burst(c.x, c.y, t.def.color, 30, 220, 3.5);
         this.shake = Math.max(this.shake, 7);
+        // Barrage: shots rain down across the area for half a second
+        const col = lightColor(heroLook(t.def.id, t.def.role).element, t.def.color);
+        for (let i = 0; i < 11; i++) {
+          const a = Math.random() * 6.283, d = Math.sqrt(Math.random()) * r, delay = 0.04 + i * 0.045;
+          const sx = c.x + Math.cos(a) * d, sy = c.y + Math.sin(a) * d * 0.8;
+          this.fx.push({ kind: 'strike', x: sx, y: sy, t: -delay, max: 0.2, color: col });
+          this.fx.push({ kind: 'boom', x: sx, y: sy, r: 22 + r * 0.22, t: -delay - 0.18, max: 0.32, color: i % 3 ? col : '#ffffff' });
+        }
       }
     } else if (fx.kind === 'control') {
       const c = fx.radius ? this.densest(alive, fx.radius) : null, r = (fx.radius ?? 0) * TILE;
@@ -682,6 +706,17 @@ export class Battle {
         this.fx.push({ kind: 'boom', x: cx, y: cy, r: rr * 0.8, t: 0, max: 0.5, color: t.def.color });
         this.vfx!.light(cx, cy, rr * 1.6, t.def.color, 0.6, 0.45);
         this.shake = Math.max(this.shake, 3);
+        const look = heroLook(t.def.id, t.def.role), col = lightColor(look.element, t.def.color);
+        // Waves rolling out, and a bolt binding every monster caught in it
+        for (let i = 1; i <= 2; i++) this.fx.push({ kind: 'ring', x: cx, y: cy, r: rr, t: -i * 0.14, max: 0.8, color: i % 2 ? '#ffffff' : t.def.color });
+        if (look.element === 'ice') this.fx.push({ kind: 'storm', x: cx, y: cy, r: Math.min(rr, 260), t: 0, max: 1.1, color: t.def.color });
+        let bound = 0;
+        for (const e of alive) {
+          if (bound >= 14 || (c && Math.hypot(e.x - c.x, e.y - c.y) > r + e.def.size)) continue;
+          bound++;
+          this.fx.push({ kind: 'zap', x: c ? cx : t.x, y: (c ? cy : t.y) - 8, x2: e.x, y2: e.y - 8, t: 0, max: 0.4, color: col });
+          this.vfx!.impact(look.element, t.def.color, e.x, e.y - 8, 0, 2, e.y + 15);
+        }
       }
     } else if (fx.kind === 'buff') {
       const r = (fx.radius ?? 0) * TILE;
@@ -691,7 +726,9 @@ export class Battle {
         o.buffs.push({ t: fx.dur, rate: fx.rate ?? 0, dmg: fx.dmg ?? 0 });
         if (vis) {
           this.fx.push({ kind: 'ring', x: o.x, y: o.y, r: 44, t: 0, max: 0.8, color: t.def.color });
-          this.burst(o.x, o.y, t.def.color, 14, 110, 2.5);
+          this.fx.push({ kind: 'pillar', x: o.x, y: o.y + 12, t: o === t ? 0 : -0.12, max: 1, color: t.def.color });
+          this.vfx!.embers(o.x, o.y - 4, 12, t.def.color, '#ffffff', 12);
+          if (o !== t) this.fx.push({ kind: 'zap', x: t.x, y: t.y - 16, x2: o.x, y2: o.y - 16, t: 0, max: 0.3, color: t.def.color });
         }
       }
       if (vis && fx.scope === 'near') this.fx.push({ kind: 'ring', x: t.x, y: t.y, r, t: 0, max: 0.6, color: t.def.color });
@@ -704,20 +741,29 @@ export class Battle {
         this.fx.push({ kind: 'beam', x: t.x, y: t.y - 14, x2: target.x, y2: target.y, t: 0, max: 0.3, color: t.def.color });
         this.boom(target.x, target.y, 50, t.def.color, 0.45, t);
         this.burst(target.x, target.y, t.def.color, 18, 180, 3);
-        this.shake = Math.max(this.shake, 5);
+        this.shake = Math.max(this.shake, 6);
+        // Judgement from above: a column of light slams down on the target
+        this.fx.push({ kind: 'laser', x: target.x + 30, y: target.y - 420, x2: target.x, y2: target.y, t: 0, max: 0.45, color: t.def.color });
+        this.fx.push({ kind: 'ring', x: target.x, y: target.y, r: 90, t: 0, max: 0.6, color: '#ffffff' });
+        this.fx.push({ kind: 'ring', x: target.x, y: target.y, r: 130, t: -0.1, max: 0.7, color: t.def.color });
+        this.vfx!.shards(target.x, target.y, 12, '#3a3128', 300, target.y + 15, 'debris');
+        this.stop(0.09);
       }
     }
     t.ultCd = u.cd;
     t.flash = 0.3;
     t.ultT = 0;
     if (vis) {
-      this.fx.push({ kind: 'text', x: t.x, y: t.y - 62, t: 0, max: 1.3, color: '#ffd84a', text: u.name, size: 17 });
+      const band = !this.vfx!.low && store.data.speed <= 4;
+      // The name floats above the champion only when the cut-in band is not shown
+      if (!band) this.fx.push({ kind: 'text', x: t.x, y: t.y - 62, t: 0, max: 1.3, color: '#ffd84a', text: u.name, size: 17 });
       sfx('ult');
       // The ground darkens for a moment so the ultimate's light carries
       this.dim = 1;
       this.vfx!.light(t.x, t.y - 20, 150, t.def.color, 0.75, 0.6);
       this.vfx!.embers(t.x, t.y - 6, 14, t.def.color, '#ffffff', 14);
       this.stop(0.06);
+      if (band) this.cutin = { id: t.def.id, name: u.name, champ: t.def.name, color: t.def.color, t: 0 };
     }
     return true;
   }
@@ -1246,6 +1292,7 @@ export class Battle {
     this.dim = Math.max(0, this.dim - dt * 1.5);
     this.nexusHurt = Math.max(0, this.nexusHurt - dt);
     if (this.banner) { this.banner.t += dt; if (this.banner.t > 2) this.banner = null; }
+    if (this.cutin) { this.cutin.t += dt; if (this.cutin.t > CUTIN) this.cutin = null; }
 
     // Champions: keep facing the current target, ease the attack pose, land with a puff of dust
     for (const t of this.towers) {
@@ -1406,6 +1453,34 @@ export class Battle {
         g.globalAlpha = k;
         g.lineWidth = 2.6 * k + 0.8;
         g.stroke();
+      } else if (f.kind === 'strike') {
+        // A shot falling from the sky onto its landing point
+        const u = 1 - k, hx = f.x + 70 * (1 - u), hy = f.y - 300 * (1 - u);
+        g.globalCompositeOperation = 'lighter';
+        g.strokeStyle = f.color;
+        g.globalAlpha = 0.5;
+        g.lineWidth = 7;
+        seg(g, hx + 16, hy - 68, hx, hy);
+        g.strokeStyle = '#ffffff';
+        g.globalAlpha = 0.95;
+        g.lineWidth = 2.4;
+        seg(g, hx + 9, hy - 38, hx, hy);
+        drawGlow(g, hx, hy, 13, f.color, 1);
+        g.globalCompositeOperation = 'source-over';
+      } else if (f.kind === 'pillar') {
+        // Column of light rising from the ground
+        const u = 1 - k, a = Math.sin(Math.PI * Math.min(1, u * 1.05)), hgt = 70 + 60 * Math.min(1, u * 3);
+        g.globalCompositeOperation = 'lighter';
+        drawGlow(g, f.x, f.y - hgt * 0.8, 30, f.color, a * 0.9, hgt);
+        drawGlow(g, f.x, f.y - hgt * 0.8, 9, '#ffffff', a * 0.9, hgt);
+        drawGlow(g, f.x, f.y, 34, '#ffffff', a * 0.7, 10);
+        g.globalAlpha = k;
+        g.strokeStyle = f.color;
+        g.lineWidth = 2.5;
+        g.beginPath();
+        g.ellipse(f.x, f.y, 14 + u * 36, (14 + u * 36) * 0.36, 0, 0, Math.PI * 2);
+        g.stroke();
+        g.globalCompositeOperation = 'source-over';
       } else if (f.kind === 'zap') {
         bolt(g, f.x, f.y, f.x2!, f.y2!, f.color, k);
       } else if (f.kind === 'laser') {
@@ -1576,6 +1651,7 @@ export class Battle {
       g.globalAlpha = 1;
     }
     g.restore();
+    if (this.cutin) this.drawCutin(g, this.cutin);
     if (this.banner) this.drawBanner(g, this.banner);
     if (this.hover) {
       const f = this.featureAt(this.hover.c, this.hover.r);
@@ -1689,6 +1765,65 @@ export class Battle {
     g.moveTo(-13, fy - 2);
     g.lineTo(13, fy - 2);
     g.stroke();
+    g.restore();
+  }
+
+  /** Ultimate cut-in: slanted band with the champion's splash art, the ultimate's name and a streak of light. */
+  private drawCutin(g: CanvasRenderingContext2D, c: { id: string; name: string; champ: string; color: string; t: number }): void {
+    const inK = Math.min(1, c.t / 0.16), outK = Math.min(1, Math.max(0, (CUTIN - c.t) / 0.22));
+    const ease = 1 - (1 - inK) ** 3;
+    const bw = W * 0.56, bh = 66, y0 = 6, skew = 24;
+    const x0 = -bw * (1 - ease) - (1 - outK) * 40;
+    g.save();
+    g.globalAlpha = Math.min(1, inK * 1.5) * outK;
+    const shape = (pad: number) => {
+      g.beginPath();
+      g.moveTo(x0 - 20, y0 - pad); g.lineTo(x0 + bw + pad, y0 - pad); g.lineTo(x0 + bw - skew + pad, y0 + bh + pad); g.lineTo(x0 - 20, y0 + bh + pad);
+      g.closePath();
+    };
+    // Coloured edge, then the art clipped to the band
+    shape(3);
+    g.fillStyle = c.color;
+    g.fill();
+    shape(0);
+    g.fillStyle = '#010a13';
+    g.fill();
+    g.save();
+    g.clip();
+    const img = splashImage(c.id);
+    if (img) {
+      const iw = bw * 1.08, ih = (img.naturalHeight / img.naturalWidth) * iw;
+      // Slow push across the art while the band is up
+      g.drawImage(img, x0 + bw - iw + c.t * 14, y0 - ih * 0.2, iw, ih);
+    }
+    const shadeL = g.createLinearGradient(x0, 0, x0 + bw, 0);
+    shadeL.addColorStop(0, 'rgba(1,10,19,0.95)');
+    shadeL.addColorStop(0.45, 'rgba(1,10,19,0.55)');
+    shadeL.addColorStop(1, 'rgba(1,10,19,0)');
+    g.fillStyle = shadeL;
+    g.fillRect(x0 - 20, y0, bw + 40, bh);
+    // Streak of light sweeping across as it arrives
+    const sweep = x0 + (c.t / 0.5) * (bw + 200) - 100;
+    if (c.t < 0.5) {
+      g.globalCompositeOperation = 'lighter';
+      drawGlow(g, sweep, y0 + bh / 2, 90, '#ffffff', 0.5, bh);
+      g.globalCompositeOperation = 'source-over';
+    }
+    g.restore();
+    g.textAlign = 'left';
+    g.lineJoin = 'round';
+    g.font = '700 22px Cinzel, serif';
+    g.lineWidth = 4;
+    g.strokeStyle = 'rgba(1,10,19,0.9)';
+    const tx = Math.max(22, x0 + 26);
+    g.strokeText(c.name, tx, y0 + 34);
+    g.fillStyle = '#f0e6d2';
+    g.fillText(c.name, tx, y0 + 34);
+    g.font = '700 12px "Source Sans 3", system-ui, sans-serif';
+    g.fillStyle = c.color;
+    g.fillText(c.champ.toUpperCase().split('').join(' '), tx + 2, y0 + 54);
+    g.fillStyle = '#c8aa6e';
+    g.fillRect(tx, y0 + 40, 150, 1.5);
     g.restore();
   }
 
