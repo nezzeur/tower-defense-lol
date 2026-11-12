@@ -10,7 +10,7 @@ Personal, local-only LoL-themed tower defense (PokéPath-like progression). Orig
 ## Commands
 - `npm run dev` (port 5173; user's real save lives on origin localhost:5174)
 - `npm run sim -- <starter> <hours>` headless balance bot; env `GROWTH`, `BASE`, `BAL`, `LOG=<mapId>`
-- `?save=<name>` URL param = separate save slot for testing
+- `?save=<name>` URL param = separate save slot for testing; `?save=demo` starts with all champions (lvl 20), all maps cleared, 5M gold
 
 ## Layout
 - `src/game.ts` rules: stats, levels (max 150), stars, unlocks (`unlockReason`, `isArena`), economy `BALANCE`, waves, chests

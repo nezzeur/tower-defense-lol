@@ -1,3 +1,5 @@
+import { CHAMPIONS } from './data/champions';
+import { MAPS } from './data/maps';
 import type { Priority } from './types';
 
 export interface Placement { id: string; c: number; r: number }
@@ -47,6 +49,16 @@ function fresh(): SaveData {
   };
 }
 
+/** `?save=demo`: a try-out slot that starts with every champion (level 20), every map cleared and plenty of gold. */
+function demo(): SaveData {
+  const d = fresh();
+  d.owned = CHAMPIONS.map((c) => c.id);
+  for (const c of CHAMPIONS) d.levels[c.id] = 20;
+  for (const m of MAPS) d.best[m.id] = m.waves;
+  d.gold = 5_000_000;
+  return d;
+}
+
 function sanitize(raw: unknown): SaveData {
   const d = { ...fresh(), ...(raw as Partial<SaveData>) };
   if (d.v !== 1 || !Array.isArray(d.owned) || typeof d.gold !== 'number') throw new Error('bad save');
@@ -72,7 +84,7 @@ function load(): SaveData {
       console.warn(`Invalid save reset to defaults; raw copy kept under "${bak}"`);
     }
   }
-  return fresh();
+  return slot === 'demo' && !txt ? demo() : fresh();
 }
 
 export const store: { data: SaveData } = { data: load() };
