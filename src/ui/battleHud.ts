@@ -55,7 +55,7 @@ export function startBattle(mapId: string): void {
           <span class="small muted">Mode</span>
           <button class="chip" data-mode="normal" title="Les ${map.waves} vagues de la carte">Normal</button>
           <button class="chip" data-mode="boss" title="Commence directement à la vague ${map.waves}">Boss ⚔</button>
-          <button class="chip" data-mode="endless" title="Après la vague ${map.waves} : les vagues continuent sans fin, de plus en plus dures, avec le boss toutes les 10 vagues">Infini ∞</button>
+          <button class="chip" data-mode="endless" title="Après la vague ${map.waves} : les vagues continuent sans fin, de plus en plus dures, avec le boss toutes les 10 vagues. Une bénédiction à choisir toutes les ${BOON_EVERY} vagues.">Infini ∞</button>
         </div>
         <button class="btn start" id="b-start" data-startwave>Lancer la vague ▶</button>
       </div>
@@ -230,12 +230,12 @@ function wavePanel(b: Battle): string {
       <div class="hud-title">Prochaine vague</div>
       <div class="next-wave">${next.length ? next.map((x) => `<div class="nw">${creatureIcon(x.id)}<span>x${x.n}</span><i class="nw-traits">${enemyTraits(ENEMIES[x.id]).map((t) => t.icon).join('')}</i></div>`).join('') : '<span class="small muted">—</span>'}</div>
     </div>
-    <div class="hud-card">
+    ${b.endless ? `<div class="hud-card">
       <div class="hud-title">Bénédictions</div>
       ${Object.keys(b.boons).length
         ? `<div class="boon-list">${Object.entries(b.boons).map(([id, n]) => `<span class="tagc" title="${esc(BOON_BY_ID[id].desc)}">${BOON_BY_ID[id].icon} ${esc(BOON_BY_ID[id].name)}${n > 1 ? ` ×${n}` : ''}</span>`).join('')}</div>`
         : `<span class="small muted">Un bonus à choisir toutes les ${BOON_EVERY} vagues.</span>`}
-    </div>
+    </div>` : ''}
     <div class="hud-card">
       <div class="hud-title">Synergies</div>
       ${synergyList(b)}

@@ -1372,10 +1372,9 @@ export class Battle {
     const heal = this.towers.reduce((n, t) => n + (t.stats.livesPerWave ?? 0), 0) + (this.boons.ward ?? 0) * (BOON_BY_ID.ward.value ?? 0);
     this.lives = Math.min(MAX_LIVES, this.lives + heal);
     persist();
-    // A blessing to choose every few waves; the run waits for the choice
-    const lastWave = !this.endless && this.wave >= this.map.waves;
-    const count = this.endless ? this.endlessWave() : this.wave;
-    if (!lastWave && count > 0 && count % BOON_EVERY === 0) {
+    // Endless mode only: every few waves the run waits for the player to choose a blessing
+    const count = this.endlessWave();
+    if (this.endless && count > 0 && count % BOON_EVERY === 0) {
       this.boonOffer = rollBoons();
       this.boonT = BOON_AUTO_DELAY;
       if (!this.visual) this.pickBoon();

@@ -1,6 +1,6 @@
 import type { SynStat } from './synergies';
 
-/** A blessing picked between waves; it lasts until the end of the run. Stackable. */
+/** A blessing picked between waves of endless mode; it lasts until the end of the run. Stackable. */
 export interface BoonDef {
   id: string;
   name: string;
@@ -19,8 +19,8 @@ export const BOON_EVERY = 5;
 export const BOON_AUTO_DELAY = 8;
 
 export const BOONS: BoonDef[] = [
-  { id: 'might', name: 'Force', icon: '⚔️', desc: '+7 % de dégâts pour toute l\'équipe', stat: 'dmg', value: 0.07 },
-  { id: 'haste', name: 'Célérité', icon: '💨', desc: '+6 % de vitesse d\'attaque pour toute l\'équipe', stat: 'rate', value: 0.06 },
+  { id: 'might', name: 'Force', icon: '⚔️', desc: '+10 % de dégâts pour toute l\'équipe', stat: 'dmg', value: 0.1 },
+  { id: 'haste', name: 'Célérité', icon: '💨', desc: '+8 % de vitesse d\'attaque pour toute l\'équipe', stat: 'rate', value: 0.08 },
   { id: 'reach', name: 'Longue-vue', icon: '🔭', desc: '+8 % de portée pour toute l\'équipe', stat: 'range', value: 0.08 },
   { id: 'fortune', name: 'Fortune', icon: '🪙', desc: '+25 % d\'or sur les éliminations', stat: 'gold', value: 0.25 },
   { id: 'focus', name: 'Concentration', icon: '🌀', desc: 'Les ultimes se rechargent 20 % plus vite', stat: 'ultCd', value: 0.2 },
