@@ -4,6 +4,7 @@ import { FEATURE_INFO } from '../art/mapArt';
 import { Battle, initials, PRIORITIES, SPELLS, type Enemy, type SpellId, type Tower } from '../battle';
 import { SYN_TIERS, synText, teamSynergies } from '../data/synergies';
 import type { Priority } from '../types';
+import { BOON_BY_ID, BOON_EVERY } from '../data/boons';
 import { ENEMIES, enemyTraits } from '../data/enemies';
 import { lootRolls, lootTable, MAT_BY_ID, MATERIALS } from '../data/loot';
 import { matChip } from './inventory';
@@ -36,6 +37,7 @@ export function startBattle(mapId: string): void {
       <aside class="hud-panel" id="wave-panel"></aside>
       <div class="board" id="board">
         <div class="overlay hidden" id="overlay"></div>
+        <div class="overlay boon-ov hidden" id="boon-ov"></div>
       </div>
       <aside class="hud-panel" id="details"></aside>
     </div>
@@ -79,6 +81,18 @@ export function renderSide(): void {
   if (!b) return;
   const ov = document.getElementById('overlay')!;
   if (!b.over) ov.classList.add('hidden');
+  // Blessing choice between waves
+  const bo = document.getElementById('boon-ov')!;
+  if (b.boonOffer && !b.over) {
+    bo.innerHTML = `<div class="result boon-box"><h2>Bénédiction</h2>
+      <p class="small muted">Choisis un bonus : il dure jusqu'à la fin de la partie et se cumule.${store.data.auto ? ' Vagues auto : choix au hasard dans quelques secondes.' : ''}</p>
+      <div class="boon-row">${b.boonOffer.map((x) => `<button class="boon-card" data-boon="${x.id}">
+        <span class="boon-ico">${x.icon}</span><b>${esc(x.name)}</b><span class="small">${esc(x.desc)}</span>
+        ${b.boons[x.id] ? `<i class="small muted">Déjà pris ×${b.boons[x.id]}</i>` : ''}</button>`).join('')}</div></div>`;
+    bo.classList.remove('hidden');
+  } else {
+    bo.classList.add('hidden');
+  }
   const details = document.getElementById('details')!;
   const t = b.selectedTower;
   if (t) b.selectedEnemy = null;
@@ -217,6 +231,12 @@ function wavePanel(b: Battle): string {
       <div class="next-wave">${next.length ? next.map((x) => `<div class="nw">${creatureIcon(x.id)}<span>x${x.n}</span><i class="nw-traits">${enemyTraits(ENEMIES[x.id]).map((t) => t.icon).join('')}</i></div>`).join('') : '<span class="small muted">—</span>'}</div>
     </div>
     <div class="hud-card">
+      <div class="hud-title">Bénédictions</div>
+      ${Object.keys(b.boons).length
+        ? `<div class="boon-list">${Object.entries(b.boons).map(([id, n]) => `<span class="tagc" title="${esc(BOON_BY_ID[id].desc)}">${BOON_BY_ID[id].icon} ${esc(BOON_BY_ID[id].name)}${n > 1 ? ` ×${n}` : ''}</span>`).join('')}</div>`
+        : `<span class="small muted">Un bonus à choisir toutes les ${BOON_EVERY} vagues.</span>`}
+    </div>
+    <div class="hud-card">
       <div class="hud-title">Synergies</div>
       ${synergyList(b)}
     </div>
@@ -309,6 +329,7 @@ export function refreshLive(): void {
     const ready = b.ultReady(st.t);
     btn.disabled = !ready;
     btn.classList.toggle('ready', ready);
+    btn.classList.toggle('aim', b.aiming === st.t);
     btn.style.setProperty('--p', `${Math.round(st.p * 360)}deg`);
     const n = btn.querySelector('.cdn');
     const txt = ready ? '' : String(Math.ceil(st.t.ultCd));
@@ -321,7 +342,7 @@ export function refreshLive(): void {
       const ready = b.ultReady(st.t);
       big.disabled = !ready;
       const key = st.i < 9 ? ` [${st.i + 1}]` : '';
-      const txt = `${st.t.def.active.name} — ${ready ? `prêt${key}` : `${Math.ceil(st.t.ultCd)} s`}`;
+      const txt = `${st.t.def.active.name} — ${b.aiming === st.t ? 'vise sur la carte…' : ready ? `prêt${key}` : `${Math.ceil(st.t.ultCd)} s`}`;
       if (big.textContent !== txt) big.textContent = txt;
       big.style.setProperty('--p', `${Math.round(st.p * 100)}%`);
       big.classList.toggle('ready', ready);
@@ -354,7 +375,8 @@ export function refreshLive(): void {
     el.classList.toggle('on', m === b.mode());
     el.classList.toggle('hidden', (m === 'boss' && !canBoss) || (m === 'endless' && !canEndless));
   });
-  set('b-hint', !b.towers.length ? 'Place au moins un champion avant de lancer la vague.'
+  set('b-hint', b.aiming ? `${b.aiming.def.active.name} : clique sur la carte pour viser · reclique le bouton pour viser tout seul · clic droit pour annuler`
+    : !b.towers.length ? 'Place au moins un champion avant de lancer la vague.'
     : store.data.auto ? (b.wave === 0 && !b.waveActive ? 'Vagues auto : choisis ton mode puis lance la première vague, la suite s\'enchaîne.' : 'Mode auto : vagues et redémarrages automatiques.') : '');
 }
 

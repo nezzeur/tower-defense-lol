@@ -177,3 +177,16 @@
 
 .modes { display: flex; gap: 6px; align-items: center; justify-content: flex-end; padding: 6px 8px; background: var(--bg2); border: 1px solid var(--gold3); }
 .modes > span { font: 700 11px var(--font-head); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold2); margin-right: 4px; }
+
+/* Aimed ultimates and blessings */
+.ult-btn.aim { outline: 2px solid var(--teal1); outline-offset: 2px; box-shadow: 0 0 14px var(--teal1); }
+.boon-ov { z-index: 3; }
+.boon-box { max-width: 640px; border-image: var(--frame-hi) 1; }
+.boon-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+.boon-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 10px; text-align: center; background: var(--bg2); border: 1px solid var(--gold4); color: var(--text); transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s; }
+.boon-card:hover { border-color: var(--teal1); transform: translateY(-2px); box-shadow: 0 0 16px rgba(10, 200, 185, 0.35); }
+.boon-card b { font: 700 14px var(--font-head); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold1); }
+.boon-card i { font-style: normal; }
+.boon-ico { font-size: 30px; line-height: 1; }
+.boon-list { display: flex; flex-wrap: wrap; gap: 4px; }
+@media (max-width: 640px) { .boon-row { grid-template-columns: 1fr; } }

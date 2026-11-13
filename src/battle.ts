@@ -10,6 +10,7 @@ import { Vfx } from './art/vfx';
 import type { MapLight } from './art/regionArt';
 import { sfx } from './audio';
 import { ENEMIES } from './data/enemies';
+import { BOON_AUTO_DELAY, BOON_BY_ID, BOON_EVERY, rollBoons, type BoonDef } from './data/boons';
 import { MAT_BY_ID, rollLoot } from './data/loot';
 import { teamSynergies, type SynStat } from './data/synergies';
 import { COLS, ROWS } from './data/maps';
@@ -205,6 +206,14 @@ export class Battle {
   /** Team-wide region synergy bonuses (fractions), refreshed whenever the team changes. */
   syn: Partial<Record<SynStat, number>> = {};
   private hover: { c: number; r: number } | null = null;
+  /** Pointer position on the board (canvas px), for aiming. */
+  private mouse: { x: number; y: number } | null = null;
+  /** Champion whose ultimate is being aimed: the next click on the board casts it there. */
+  aiming: Tower | null = null;
+  /** Blessings picked this run (id -> stacks) and the three currently on offer, if any. */
+  boons: Record<string, number> = {};
+  boonOffer: BoonDef[] | null = null;
+  private boonT = 0;
 
   // Visual-only state (skipped headless)
   /** Particles, lights, ground marks and dying monsters; null in headless runs. */
@@ -323,6 +332,8 @@ export class Battle {
     for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) {
       if (this.featureAt(c + dc, r + dr) === 'dragon') { s.dmg *= 1.15; dc = dr = 2; }
     }
+    const ember = (this.boons.ember ?? 0) * (BOON_BY_ID.ember.value ?? 0);
+    if (ember) s.burn = s.burn ? { mult: s.burn.mult + ember, dur: s.burn.dur } : { mult: ember, dur: 3 };
     const sy = this.syn;
     if (sy.dmg) s.dmg *= 1 + sy.dmg;
     if (sy.rate) s.rate *= 1 + sy.rate;
@@ -373,6 +384,11 @@ export class Battle {
     this.syn = {};
     for (const a of teamSynergies(this.towers.map((x) => x.def.region))) {
       if (a.tier) this.syn[a.def.stat] = (this.syn[a.def.stat] ?? 0) + a.value;
+    }
+    // Blessings of the run feed the same team-wide channels
+    for (const [id, n] of Object.entries(this.boons)) {
+      const b = BOON_BY_ID[id];
+      if (b?.stat) this.syn[b.stat] = (this.syn[b.stat] ?? 0) + (b.value ?? 0) * n;
     }
     for (const t of this.towers) t.stats = this.statsAt(t.def, t.c, t.r);
   }
@@ -457,10 +473,11 @@ export class Battle {
     const cv = this.canvas;
     const cursor = () => {
       const t = this.hover && this.towers.find((x) => x.c === this.hover!.c && x.r === this.hover!.r);
-      cv.style.cursor = this.dragging ? 'grabbing' : t ? 'grab' : this.selectedRoster ? 'copy' : 'default';
+      cv.style.cursor = this.aiming ? 'crosshair' : this.dragging ? 'grabbing' : t ? 'grab' : this.selectedRoster ? 'copy' : 'default';
     };
     cv.addEventListener('pointermove', (e) => {
       this.hover = this.tileAtClient(e.clientX, e.clientY);
+      this.mouse = this.pointAtClient(e.clientX, e.clientY);
       if (drag && !this.dragging && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) {
         this.dragging = drag.t;
         this.selectedTower = drag.t;
@@ -495,6 +512,7 @@ export class Battle {
     cv.addEventListener('pointercancel', () => { drag = null; this.dragging = null; cursor(); this.ev.onChange(); });
     cv.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      this.aiming = null;
       this.selectedRoster = null;
       this.selectedTower = null;
       this.selectedEnemy = null;
@@ -507,6 +525,13 @@ export class Battle {
     if (e.button !== 0) return;
     const tile = this.tileAtClient(e.clientX, e.clientY);
     if (!tile) return;
+    if (this.aiming) {
+      // Aimed ultimate: it lands where the player clicked
+      // (stays armed when there is nothing on the board to hit yet)
+      if (this.castUlt(this.aiming, this.pointAtClient(e.clientX, e.clientY))) this.aiming = null;
+      this.ev.onChange();
+      return;
+    }
     const { c, r } = tile;
     const hit = this.towers.find((t) => t.c === c && t.r === r);
     if (this.selectedRoster && !hit) {
@@ -551,7 +576,7 @@ export class Battle {
   }
 
   startWave(): void {
-    if (this.waveActive || this.over) return;
+    if (this.waveActive || this.over || this.boonOffer) return;
     if (this.bossMode && this.wave === 0) this.wave = this.map.waves - 1;
     if (this.endless && this.wave === 0) this.wave = this.map.waves;
     this.wave++;
@@ -624,6 +649,10 @@ export class Battle {
     this.vfx?.clear();
     this.runKills = this.runGold = this.runTime = 0;
     this.runLoot = {};
+    this.boons = {};
+    this.boonOffer = null;
+    this.aiming = null;
+    this.refreshStats();
     this.spawnCount = 0;
     for (const tu of this.turrets) tu.cd = 0;
     store.data.runs++;
@@ -674,8 +703,52 @@ export class Battle {
     e.burns.push({ dps, t: dur, src });
   }
 
-  /** Casts the champion's active ultimate; false when it is on cooldown or has nothing to act on. */
-  castUlt(t: Tower): boolean {
+  /** True when this ultimate lands on a spot the player can choose (area blasts and area control). */
+  needsAim(t: Tower): boolean {
+    const fx = t.def.active.fx;
+    return fx.kind === 'burst' || (fx.kind === 'control' && !!fx.radius);
+  }
+
+  /** Radius (px) of the area an aimed ultimate covers. */
+  aimRadius(t: Tower): number {
+    const fx = t.def.active.fx;
+    return ((fx.kind === 'burst' || fx.kind === 'control') && fx.radius ? fx.radius : 0) * TILE;
+  }
+
+  /**
+   * Ultimate button or key: aimed ultimates first show their target circle (a click on the board casts there,
+   * pressing again lets the game pick the densest group); the others fire at once.
+   */
+  requestUlt(t: Tower): void {
+    if (!this.ultReady(t)) return;
+    if (this.needsAim(t) && this.aiming !== t) { this.aiming = t; this.selectedRoster = null; this.ev.onChange(); return; }
+    this.aiming = null;
+    this.castUlt(t);
+    this.ev.onChange();
+  }
+
+  /** Takes one of the offered blessings (or a random one) and lets the run go on. */
+  pickBoon(id?: string): void {
+    const offer = this.boonOffer;
+    if (!offer) return;
+    const b = offer.find((x) => x.id === id) ?? offer[Math.floor(Math.random() * offer.length)];
+    this.boonOffer = null;
+    this.boons[b.id] = (this.boons[b.id] ?? 0) + 1;
+    if (b.special === 'lives') this.lives = Math.min(MAX_LIVES, this.lives + (b.value ?? 0));
+    this.refreshStats();
+    if (this.visual) {
+      sfx('upgrade');
+      this.showBanner(`${b.icon} ${b.name}`, b.desc, '#0ac8b9');
+      const end = this.pts[this.pts.length - 1];
+      for (const t of this.towers) this.fx.push({ kind: 'pillar', x: t.x, y: t.y + 12, t: 0, max: 0.9, color: '#0ac8b9' });
+      if (b.special) this.fx.push({ kind: 'pillar', x: end.x, y: end.y + 14, t: 0, max: 1, color: '#6be08a' });
+    }
+    if (store.data.auto) this.autoT = 1;
+    this.ev.onChange();
+  }
+
+  /** Casts the champion's active ultimate (at a chosen spot when aimed); false when it is on cooldown or has nothing to act on. */
+  castUlt(t: Tower, at?: { x: number; y: number }): boolean {
     if (!this.ultReady(t)) return false;
     const u = t.def.active, fx = u.fx;
     const alive = this.enemies.filter((e) => !e.dead);
@@ -707,7 +780,7 @@ export class Battle {
     } else if (!alive.length) {
       return false;
     } else if (fx.kind === 'burst') {
-      const c = this.densest(alive, fx.radius), r = fx.radius * TILE;
+      const c = at ?? this.densest(alive, fx.radius), r = fx.radius * TILE;
       for (const e of alive) {
         if (Math.hypot(e.x - c.x, e.y - c.y) > r + e.def.size) continue;
         this.damage(e, dmg * fx.mult, t, false);
@@ -728,7 +801,7 @@ export class Battle {
         }
       }
     } else if (fx.kind === 'control') {
-      const c = fx.radius ? this.densest(alive, fx.radius) : null, r = (fx.radius ?? 0) * TILE;
+      const c = fx.radius ? at ?? this.densest(alive, fx.radius) : null, r = (fx.radius ?? 0) * TILE;
       for (const e of alive) {
         if (c && Math.hypot(e.x - c.x, e.y - c.y) > r + e.def.size) continue;
         const k = this.grip(e);
@@ -874,6 +947,8 @@ export class Battle {
     const charge = dt * (1 + (this.syn.ultCd ?? 0));
     for (const t of this.towers) t.ultCd = Math.max(0, t.ultCd - charge);
     if (store.data.autoUlt && this.waveActive && !this.over && (this.autoUltT -= dt) <= 0) { this.autoUltT = 0.5; this.autoUlts(); }
+    if (this.boonOffer && store.data.auto && (this.boonT -= dt) <= 0) this.pickBoon();
+    if (this.aiming && (!this.towers.includes(this.aiming) || !this.ultReady(this.aiming))) this.aiming = null;
     this.saveT += dt;
     if (this.saveT > 10) { this.saveT = 0; persist(); }
 
@@ -1294,10 +1369,20 @@ export class Battle {
     if (this.wave !== this.map.waves) this.showBanner(this.endless ? `Infini · vague ${this.endlessWave()} repoussée` : `Vague ${this.wave} repoussée`, `+${fmtShort(bonus)} or`, '#f5c542');
     d.best[this.map.id] = Math.max(d.best[this.map.id] ?? 0, Math.min(this.wave, this.map.waves));
     if (this.endless) d.endless[this.map.id] = Math.max(d.endless[this.map.id] ?? 0, this.endlessWave());
-    const heal = this.towers.reduce((n, t) => n + (t.stats.livesPerWave ?? 0), 0);
+    const heal = this.towers.reduce((n, t) => n + (t.stats.livesPerWave ?? 0), 0) + (this.boons.ward ?? 0) * (BOON_BY_ID.ward.value ?? 0);
     this.lives = Math.min(MAX_LIVES, this.lives + heal);
     persist();
-    if (this.endless) {
+    // A blessing to choose every few waves; the run waits for the choice
+    const lastWave = !this.endless && this.wave >= this.map.waves;
+    const count = this.endless ? this.endlessWave() : this.wave;
+    if (!lastWave && count > 0 && count % BOON_EVERY === 0) {
+      this.boonOffer = rollBoons();
+      this.boonT = BOON_AUTO_DELAY;
+      if (!this.visual) this.pickBoon();
+    }
+    if (this.boonOffer) {
+      this.autoT = -1;
+    } else if (this.endless) {
       // Endless: no victory, the next wave is always coming
       if (d.auto) this.autoT = 1;
     } else if (this.wave >= this.map.waves) {
@@ -1485,6 +1570,29 @@ export class Battle {
           g.restore();
         }
       }
+    }
+    if (this.aiming && this.mouse) {
+      // Aiming an ultimate: its area follows the pointer
+      const t = this.aiming, r = this.aimRadius(t), m = this.mouse, pulse = 1 + Math.sin(this.clock * 6) * 0.03;
+      g.globalCompositeOperation = 'lighter';
+      drawGlow(g, m.x, m.y, r * 1.15, t.def.color, 0.3);
+      g.globalCompositeOperation = 'source-over';
+      g.strokeStyle = t.def.color;
+      g.lineWidth = 2.5;
+      g.setLineDash([10, 7]);
+      g.lineDashOffset = -this.clock * 26;
+      g.beginPath(); g.arc(m.x, m.y, r * pulse, 0, Math.PI * 2); g.stroke();
+      g.setLineDash([]);
+      g.strokeStyle = '#ffffff';
+      g.lineWidth = 1.5;
+      g.beginPath();
+      g.moveTo(m.x - 9, m.y); g.lineTo(m.x + 9, m.y); g.moveTo(m.x, m.y - 9); g.lineTo(m.x, m.y + 9);
+      g.stroke();
+      g.globalAlpha = 0.35;
+      g.setLineDash([4, 6]);
+      g.beginPath(); g.moveTo(t.x, t.y - 14); g.lineTo(m.x, m.y); g.stroke();
+      g.setLineDash([]);
+      g.globalAlpha = 1;
     }
     if (this.selectedTower && !this.dragging) this.rangeRing(g, this.selectedTower.x, this.selectedTower.y, this.selectedTower.stats.range, 'rgba(240,230,210,0.85)');
 

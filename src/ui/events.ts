@@ -131,7 +131,8 @@ app.addEventListener('click', (e) => {
     else flash(`Tous les emplacements sont pris (${teamSlots()}). Retire un champion ou gagne des ★.`);
     return renderSide();
   }
-  if (d.ult) { const t = b.towers.find((x) => x.def.id === d.ult); if (t) b.castUlt(t); return refreshLive(); }
+  if (d.ult) { const t = b.towers.find((x) => x.def.id === d.ult); if (t) b.requestUlt(t); return refreshLive(); }
+  if (d.boon) { b.pickBoon(d.boon); return renderSide(); }
   if (d.deselectEnemy !== undefined) { b.selectedEnemy = null; return renderSide(); }
   if (d.deselect !== undefined) { b.selectedTower = null; return renderSide(); }
   if (d.remove !== undefined && b.selectedTower) { b.remove(b.selectedTower); return renderSide(); }
@@ -239,10 +240,10 @@ window.addEventListener('pointerup', (e) => {
 window.addEventListener('keydown', (e) => {
   if (!ui.battle || ['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
   if (e.code === 'Space') { e.preventDefault(); if (ui.battle.towers.length) ui.battle.startWave(); }
-  if (e.key === 'Escape') { ui.battle.selectedRoster = null; ui.battle.selectedTower = null; ui.battle.selectedEnemy = null; renderSide(); }
+  if (e.key === 'Escape') { ui.battle.aiming = null; ui.battle.selectedRoster = null; ui.battle.selectedTower = null; ui.battle.selectedEnemy = null; renderSide(); }
   if (/^[1-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
     const t = ui.battle.towers[Number(e.key) - 1];
-    if (t && ui.battle.castUlt(t)) refreshLive();
+    if (t) { ui.battle.requestUlt(t); refreshLive(); }
   }
   if (e.key.toLowerCase() === 'p') ui.battle.paused = !ui.battle.paused;
 });
