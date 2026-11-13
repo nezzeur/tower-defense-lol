@@ -236,6 +236,15 @@ const theme = (id: string) => HAND.find((m) => m.id === id)!.theme;
 /** Bosses rotated through on generated maps (finals keep their own). */
 const BOSS_POOL = ['riftherald', 'poroking', 'colossus', 'petricite', 'baron', 'warbeast', 'spiritguard', 'sentinel', 'automaton', 'fallenking'];
 
+/** Bosses that guard each region's regular maps (the arena keeps its own). */
+const REGION_BOSSES: Record<string, string[]> = {
+  rift: ['riftherald', 'baron'],
+  demacia: ['petricite'],
+  freljord: ['colossus', 'poroking'],
+  noxus: ['warbeast'],
+  ionia: ['spiritguard'],
+};
+
 interface RegionPlan {
   id: string;
   style: MapStyle;
@@ -274,7 +283,7 @@ function buildMaps(): MapDef[] {
       }
       out.push(generateMap({
         id: `${plan.id}-${i + 1}`, name: entry, subtitle: plan.subtitle, region: plan.id, style: plan.style,
-        theme: { ...theme(plan.theme), style: plan.style }, waves, finalBoss: BOSS_POOL[out.length % BOSS_POOL.length], seed: seed++,
+        theme: { ...theme(plan.theme), style: plan.style }, waves, finalBoss: (REGION_BOSSES[plan.id] ?? BOSS_POOL)[i % (REGION_BOSSES[plan.id] ?? BOSS_POOL).length], seed: seed++,
       }));
     });
   }

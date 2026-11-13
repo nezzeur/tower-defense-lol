@@ -114,5 +114,6 @@ export const REGION_SVG: Record<string, string> = {
   ion_crane: flyer({ body: '#ffffff', wing: '#ffd9ec', wing2: '#ff9ed2', beak: '#f0a03a', eye: '#b3283a', crest: '#b3283a' }),
   ion_treant: treant({ bark: '#8a6a4e', bark2: '#5e4632', leaf: '#ff9ed2', leaf2: '#ffd1e8', eye: '#7ff0e0' }),
   ion_wisp: wisp('#7ff0e0', '#eafffb'),
+  voidling: wisp('#b06cff', '#f0dcff'),
   drake_cloud: drake('#cfd8e6', '#eef2f8', '#9aa8bf', '#6f7d96', '#ffffff'),
 };

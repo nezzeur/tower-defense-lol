@@ -428,7 +428,7 @@ export const CREATURE_HEIGHT: Record<string, number> = {
   dem_minion: 16, dem_golem: 23, dem_hound: 15, dem_wing: 15, drake_mountain: 30,
   frl_minion: 16, frl_wolf: 15, frl_troll: 26, frl_shaman: 17, drake_ocean: 30,
   nox_minion: 16, nox_hound: 15, nox_basilisk: 20, nox_mage: 17,
-  ion_minion: 16, ion_fox: 15, ion_crane: 16, ion_treant: 26, ion_wisp: 11, drake_cloud: 30,
+  ion_minion: 16, ion_fox: 15, ion_crane: 16, ion_treant: 26, ion_wisp: 11, voidling: 11, drake_cloud: 30,
 };
 
 /** scale > 1 draws the creature in HD (smooth vector mode) at that size multiplier. */
@@ -485,9 +485,9 @@ const TOP: Record<string, number> = {
   dem_minion: 24, dem_golem: 40, dem_hound: 44, dem_wing: 24, drake_mountain: 28,
   frl_minion: 24, frl_wolf: 44, frl_troll: 16, frl_shaman: 10, drake_ocean: 28,
   nox_minion: 24, nox_hound: 44, nox_basilisk: 30, nox_mage: 10,
-  ion_minion: 24, ion_fox: 44, ion_crane: 24, ion_treant: 4, ion_wisp: 56, drake_cloud: 28,
+  ion_minion: 24, ion_fox: 44, ion_crane: 24, ion_treant: 4, ion_wisp: 56, voidling: 56, drake_cloud: 28,
 };
-const FLOATERS = new Set(['drake', 'fallenking', 'spiritguard', 'caster', 'dem_wing', 'ion_crane', 'ion_wisp', 'frl_shaman', 'nox_mage', 'drake_mountain', 'drake_ocean', 'drake_cloud']);
+const FLOATERS = new Set(['drake', 'fallenking', 'spiritguard', 'caster', 'dem_wing', 'ion_crane', 'ion_wisp', 'voidling', 'frl_shaman', 'nox_mage', 'drake_mountain', 'drake_ocean', 'drake_cloud']);
 const RES = 6; // canvas px per low-res px of creature height
 
 function sprite(id: string): Sprite | null {

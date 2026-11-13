@@ -59,6 +59,13 @@ export interface Enemy {
   shield: number;
   /** Render only: seconds of healing glow left. */
   healed: number;
+  /** Seconds before its special move is ready again. */
+  abT: number;
+  /** Seconds left of a charge, of intangibility, and of a borrowed speed boost (with its multiplier). */
+  chargeT: number;
+  phaseT: number;
+  hasteT: number;
+  haste: number;
 }
 
 export interface Tower {
@@ -98,6 +105,8 @@ export interface Tower {
   /** Real seconds since it was placed / since its last ultimate. */
   born: number;
   ultT: number;
+  /** Seconds left frozen by a boss: the champion cannot attack. */
+  stunT: number;
 }
 
 /** Global knob on ultimate damage multipliers (bursts, control hits, executes), tuned with scripts/sim.ts. */
@@ -363,7 +372,7 @@ export class Battle {
       def, c, r, x: (c + 0.5) * TILE, y: (r + 0.5) * TILE, stats: this.statsAt(def, c, r), cd: 0.3,
       hits: 0, runStacks: 0, ramp: 0, angle: 0, flash: 0, kills: 0, dmgDone: 0,
       ultCd: def.active.cd, buffs: [], priority: store.data.priorities[id] ?? 'first',
-      aim: 0, face: 1, sw: 0, since: 9, period: 1, engaged: false, tgt: null, born: 0, ultT: 9,
+      aim: 0, face: 1, sw: 0, since: 9, period: 1, engaged: false, tgt: null, born: 0, ultT: 9, stunT: 0,
     };
     this.towers.push(t);
     this.refreshStats();
@@ -1005,6 +1014,7 @@ export class Battle {
       uid: ++this.uid, def, hp, maxHp: hp, s: s0, x: p.x, y: p.y, lane,
       slowPct: 0, slowT: 0, stunT: 0, burns: [], dead: false, hitFlash: 0, face: 1, phase: Math.random() * 6,
       kx: 0, ky: 0, sq: 0, born: at ? 0.2 : 0, shield: def.shield ?? 0, healed: 0,
+      abT: (def.ability?.cd ?? 0) * 0.6, chargeT: 0, phaseT: 0, hasteT: 0, haste: 1,
     });
   }
 
@@ -1038,8 +1048,14 @@ export class Battle {
       }
       if (e.slowT > 0) e.slowT -= dt; else e.slowPct = 0;
       if (e.stunT > 0) { e.stunT -= dt; continue; }
+      if (e.def.ability && (e.abT -= dt) <= 0) { e.abT = e.def.ability.cd; this.useAbility(e); }
+      if (e.phaseT > 0) e.phaseT -= dt;
+      if (e.hasteT > 0) e.hasteT -= dt;
+      const charging = e.chargeT > 0;
+      if (charging) e.chargeT -= dt;
       const river = !e.def.fly && this.featureAt(Math.floor(e.x / TILE), Math.floor(e.y / TILE)) === 'river' ? 0.8 : 1;
-      e.s += e.def.speed * TILE * (1 - e.slowPct) * river * dt;
+      const pace = (charging && e.def.ability?.kind === 'charge' ? e.def.ability.mult : 1 - e.slowPct) * (e.hasteT > 0 ? e.haste : 1);
+      e.s += e.def.speed * TILE * pace * river * dt;
       const p = this.posAt(e.s, e.lane);
       if (Math.abs(p.x - e.x) > 0.01) e.face = p.x > e.x ? 1 : -1;
       e.phase += dt * e.def.speed * 8 * (1 - e.slowPct);
@@ -1087,9 +1103,70 @@ export class Battle {
     return this.enemies.filter((e) => !e.dead && Math.hypot(e.x - t.x, e.y - t.y) <= r + e.def.size);
   }
 
+  /** A boss or epic monster uses its special move. */
+  private useAbility(e: Enemy): void {
+    const ab = e.def.ability!, v = this.vfx;
+    switch (ab.kind) {
+      case 'summon':
+        for (let i = 0; i < ab.n; i++) this.spawn(ab.id, { s: Math.max(0, e.s - 14 - i * 12), lane: e.lane });
+        v?.wisps(e.x, e.y - 20, 8, e.def.color);
+        break;
+      case 'charge':
+        e.chargeT = ab.dur;
+        e.slowPct = 0;
+        v?.smoke(e.x, e.y + 12, 6, 9, '#b9b2a3');
+        break;
+      case 'shield':
+        e.shield = ab.hits;
+        break;
+      case 'freeze': {
+        const r = ab.radius * TILE;
+        for (const t of this.towers) {
+          if (Math.hypot(t.x - e.x, t.y - e.y) > r) continue;
+          t.stunT = Math.max(t.stunT, ab.dur);
+          t.engaged = false;
+          if (v) { this.fx.push({ kind: 'pillar', x: t.x, y: t.y + 12, t: 0, max: 0.7, color: '#8fd3ff' }); v.shards(t.x, t.y - 10, 6, '#e8f7ff', 140, t.y + 14); }
+        }
+        if (v) this.fx.push({ kind: 'storm', x: e.x, y: e.y, r, t: 0, max: 0.9, color: '#8fd3ff' });
+        break;
+      }
+      case 'rally': {
+        const r = ab.radius * TILE;
+        for (const o of this.enemies) {
+          if (o.dead || Math.hypot(o.x - e.x, o.y - e.y) > r) continue;
+          o.hasteT = ab.dur;
+          o.haste = ab.mult;
+        }
+        break;
+      }
+      case 'phase':
+        e.phaseT = ab.dur;
+        e.burns = [];
+        break;
+      case 'mend': {
+        const r = ab.radius * TILE;
+        for (const o of this.enemies) {
+          if (o.dead || Math.hypot(o.x - e.x, o.y - e.y) > r) continue;
+          o.hp = Math.min(o.maxHp, o.hp + o.maxHp * ab.pct * (o.def.boss ? 0.5 : 1));
+          o.healed = 0.8;
+        }
+        break;
+      }
+    }
+    if (!v) return;
+    // Every special move is announced: its name above the monster, a wave of its colour, a flash
+    this.fx.push({ kind: 'text', x: e.x, y: e.y - (CREATURE_HEIGHT[e.def.id] ?? 16) * 3 - 26, t: 0, max: 1.4, color: '#ff9d5c', text: ab.name, size: 15 });
+    const reach = 'radius' in ab ? ab.radius * TILE : 60;
+    this.fx.push({ kind: 'ring', x: e.x, y: e.y, r: reach, t: 0, max: 0.6, color: e.def.color });
+    v.light(e.x, e.y - 20, reach * 1.4, e.def.color, 0.6, 0.4);
+    this.shake = Math.max(this.shake, e.def.boss ? 5 : 2.5);
+    sfx('ult');
+  }
+
   private updateTowers(dt: number): void {
     for (const t of this.towers) {
       t.flash = Math.max(0, t.flash - dt);
+      if (t.stunT > 0) { t.stunT -= dt; t.cd = Math.max(t.cd, 0.2); continue; }
       if (t.buffs.length) { for (const b of t.buffs) b.t -= dt; t.buffs = t.buffs.filter((b) => b.t > 0); }
       const s = t.stats;
       const rate = s.rate * (1 + t.ramp) * (1 + t.buffs.reduce((n, b) => n + b.rate, 0));
@@ -1320,7 +1397,7 @@ export class Battle {
   }
 
   private damage(e: Enemy, amount: number, src: Tower | null, trueDmg: boolean): void {
-    if (e.dead) return;
+    if (e.dead || e.phaseT > 0) return;
     const dealt = trueDmg ? amount : amount * (1 - Math.max(0, e.def.armor - (this.syn.armorShred ?? 0)));
     if (src) src.dmgDone += Math.min(dealt, Math.max(0, e.hp));
     e.hp -= dealt;
@@ -2174,6 +2251,7 @@ export class Battle {
     const breathe = 1 + Math.sin(this.clock * 2.6 + e.uid) * 0.012;
     g.scale((1 + e.sq * 0.14) * grow * (fly ? 1 + Math.sin(this.clock * 13 + e.uid) * 0.03 : 1), (1 - e.sq * 0.16) * grow * breathe);
     if (born < 1) g.globalAlpha *= born;
+    if (e.phaseT > 0) g.globalAlpha *= 0.35 + Math.sin(this.clock * 18) * 0.1;
     if (custom) {
       const ih = h, iw = (custom.naturalWidth / custom.naturalHeight) * ih;
       if (e.hitFlash > 0) g.filter = 'brightness(2.2)';
@@ -2183,6 +2261,18 @@ export class Battle {
       drawCreature(g, d.id, 0, 0, e.face, ph, this.clock, d.color, e.hitFlash > 0, 3);
     }
     g.restore();
+    if (e.chargeT > 0 || e.hasteT > 0) {
+      // Rushing: streaks of wind trail behind
+      g.strokeStyle = e.chargeT > 0 ? '#ffffff' : '#bfe9ff';
+      g.lineWidth = 2;
+      g.lineCap = 'round';
+      for (let i = 0; i < 4; i++) {
+        const ly = y - h * (0.15 + i * 0.2), off = ((this.clock * 9 + i * 0.37) % 1) * 22;
+        g.globalAlpha = 0.55 * (1 - off / 22);
+        g.beginPath(); g.moveTo(x - e.face * (w * 0.45 + off), ly); g.lineTo(x - e.face * (w * 0.45 + off + 16), ly); g.stroke();
+      }
+      g.globalAlpha = 1;
+    }
     if (e.healed > 0) {
       // Being healed: a green shimmer over the body
       g.globalCompositeOperation = 'lighter';
@@ -2302,6 +2392,20 @@ export class Battle {
       look: heroLook(t.def.id, t.def.role),
       frame: sel ? '#0ac8b9' : ['', '#c8aa6e', '#4a8fd8', '#c084fc'][t.def.rarity],
     });
+    if (t.stunT > 0) {
+      // Frozen by a boss: encased in ice until it thaws
+      g.globalCompositeOperation = 'lighter';
+      drawGlow(g, fx, fy - 22, 26, '#8fd3ff', 0.55, 34);
+      g.globalCompositeOperation = 'source-over';
+      g.fillStyle = 'rgba(200,236,255,0.35)';
+      g.strokeStyle = 'rgba(232,247,255,0.9)';
+      g.lineWidth = 1.5;
+      g.beginPath();
+      g.moveTo(fx - 15, fy + 2); g.lineTo(fx - 18, fy - 26); g.lineTo(fx - 6, fy - 50); g.lineTo(fx + 8, fy - 52); g.lineTo(fx + 18, fy - 28); g.lineTo(fx + 15, fy + 2);
+      g.closePath();
+      g.fill();
+      g.stroke();
+    }
     // Level badge
     g.fillStyle = '#010a13';
     g.beginPath();

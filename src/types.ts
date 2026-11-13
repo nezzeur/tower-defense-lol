@@ -108,7 +108,26 @@ export interface EnemyDef {
   split?: { id: string; n: number };
   /** Cannot be set on fire (immune to burns). */
   fireproof?: boolean;
+  /** Special move of a boss or epic monster, used on a cooldown (seconds). */
+  ability?: Ability;
 }
+
+export type Ability = { name: string; cd: number } & (
+  /** Calls n monsters of this id at its side. */
+  | { kind: 'summon'; id: string; n: number }
+  /** Rushes forward: speed x mult for dur seconds, immune to slows meanwhile. */
+  | { kind: 'charge'; dur: number; mult: number }
+  /** Raises a shield that blocks the next direct hits. */
+  | { kind: 'shield'; hits: number }
+  /** Freezes the champions within radius tiles: they stop attacking for dur seconds. */
+  | { kind: 'freeze'; radius: number; dur: number }
+  /** Speeds up every monster within radius tiles (x mult for dur seconds). */
+  | { kind: 'rally'; radius: number; dur: number; mult: number }
+  /** Turns intangible: takes no damage for dur seconds. */
+  | { kind: 'phase'; dur: number }
+  /** Heals itself and the monsters within radius tiles by pct of their max HP. */
+  | { kind: 'mend'; radius: number; pct: number }
+);
 
 export type MapStyle = 'rift' | 'jungle' | 'bridge' | 'tundra' | 'desert' | 'haunted' | 'demacia' | 'noxus' | 'ionia' | 'piltover';
 

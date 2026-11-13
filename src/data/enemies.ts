@@ -11,8 +11,8 @@ export const ENEMIES: Record<string, EnemyDef> = {
   raptor: { id: 'raptor', name: 'Raptor', hp: 7, speed: 1.9, armor: 0, gold: 2, leak: 1, size: 7, color: '#d9534f', shape: 'circle' },
   krug: { id: 'krug', name: 'Krug', hp: 70, speed: 0.65, armor: 0.3, gold: 9, leak: 2, size: 12, color: '#8a7f73', shape: 'square' },
   gromp: { id: 'gromp', name: 'Gromp', hp: 110, speed: 0.75, armor: 0.1, gold: 14, leak: 3, size: 14, color: '#5fa86a', shape: 'square' },
-  drake: { id: 'drake', name: 'Drake infernal', hp: 250, speed: 0.7, armor: 0.15, gold: 40, leak: 5, size: 17, color: '#ff6b35', shape: 'boss', fireproof: true },
-  herald: { id: 'herald', name: 'Larve du Néant', hp: 400, speed: 0.6, armor: 0.15, gold: 60, leak: 5, size: 17, color: '#8e44ad', shape: 'boss' },
+  drake: { id: 'drake', name: 'Drake infernal', hp: 250, speed: 0.7, armor: 0.15, gold: 40, leak: 5, size: 17, color: '#ff6b35', shape: 'boss', fireproof: true, ability: { name: 'Ruée ardente', cd: 9, kind: 'charge', dur: 1.6, mult: 2.4 } },
+  herald: { id: 'herald', name: 'Larve du Néant', hp: 400, speed: 0.6, armor: 0.15, gold: 60, leak: 5, size: 17, color: '#8e44ad', shape: 'boss', ability: { name: 'Essaim du Néant', cd: 8, kind: 'summon', id: 'voidling', n: 3 } },
 
   // --- Regional troops (see REGION_ROSTER in game.ts) ---
   // Demacia: armour, shields and wings
@@ -37,22 +37,25 @@ export const ENEMIES: Record<string, EnemyDef> = {
   ion_treant: { id: 'ion_treant', name: 'Gardien sylvestre', hp: 70, speed: 0.65, armor: 0.2, gold: 9, leak: 2, size: 14, color: '#b84a5a', shape: 'square', split: { id: 'ion_wisp', n: 3 } },
   ion_wisp: { id: 'ion_wisp', name: 'Feu follet', hp: 5, speed: 2, armor: 0, gold: 1, leak: 1, size: 6, color: '#7ff0e0', shape: 'diamond' },
 
+  // Called by the Void grub and the Fallen King
+  voidling: { id: 'voidling', name: 'Rejeton du Néant', hp: 6, speed: 1.9, armor: 0, gold: 1, leak: 1, size: 6, color: '#b06cff', shape: 'diamond' },
+
   // Elemental drakes: each region's epic monster (every 10 waves)
-  drake_mountain: { id: 'drake_mountain', name: 'Drake des montagnes', hp: 300, speed: 0.65, armor: 0.4, gold: 45, leak: 5, size: 17, color: '#9a8a72', shape: 'boss' },
-  drake_ocean: { id: 'drake_ocean', name: 'Drake des océans', hp: 270, speed: 0.7, armor: 0.15, gold: 45, leak: 5, size: 17, color: '#3f9fc9', shape: 'boss', regen: 0.02 },
-  drake_cloud: { id: 'drake_cloud', name: 'Drake des nuages', hp: 210, speed: 1, armor: 0.1, gold: 45, leak: 5, size: 17, color: '#cfd8e6', shape: 'boss', fly: true },
+  drake_mountain: { id: 'drake_mountain', name: 'Drake des montagnes', hp: 300, speed: 0.65, armor: 0.4, gold: 45, leak: 5, size: 17, color: '#9a8a72', shape: 'boss', ability: { name: 'Carapace de roc', cd: 11, kind: 'shield', hits: 8 } },
+  drake_ocean: { id: 'drake_ocean', name: 'Drake des océans', hp: 270, speed: 0.7, armor: 0.15, gold: 45, leak: 5, size: 17, color: '#3f9fc9', shape: 'boss', regen: 0.02, ability: { name: 'Marée apaisante', cd: 10, kind: 'mend', radius: 2.6, pct: 0.12 } },
+  drake_cloud: { id: 'drake_cloud', name: 'Drake des nuages', hp: 210, speed: 1, armor: 0.1, gold: 45, leak: 5, size: 17, color: '#cfd8e6', shape: 'boss', fly: true, ability: { name: 'Vent arrière', cd: 10, kind: 'rally', radius: 3, dur: 3, mult: 1.5 } },
 
   // Final bosses: reaching the nexus costs 12 lives and they walk the lane again.
-  riftherald: { id: 'riftherald', name: 'Héraut de la Faille', hp: 900, speed: 0.45, armor: 0.2, gold: 200, leak: 12, size: 22, color: '#7d3cff', boss: true, shape: 'boss' },
-  baron: { id: 'baron', name: 'Baron Nashor', hp: 1000, speed: 0.45, armor: 0.2, gold: 250, leak: 12, size: 24, color: '#6a1b9a', boss: true, shape: 'boss' },
-  poroking: { id: 'poroking', name: 'Roi Poro', hp: 1000, speed: 0.5, armor: 0.2, gold: 250, leak: 12, size: 24, color: '#f0f0f0', boss: true, shape: 'boss' },
-  colossus: { id: 'colossus', name: 'Colosse de glace', hp: 1100, speed: 0.4, armor: 0.25, gold: 300, leak: 12, size: 24, color: '#8fd3ff', boss: true, shape: 'boss' },
-  sentinel: { id: 'sentinel', name: 'Sentinelle de Shurima', hp: 1200, speed: 0.4, armor: 0.25, gold: 350, leak: 12, size: 24, color: '#d4a537', boss: true, shape: 'boss' },
-  fallenking: { id: 'fallenking', name: 'Spectre du Roi déchu', hp: 1300, speed: 0.42, armor: 0.25, gold: 400, leak: 12, size: 25, color: '#3dd6a3', boss: true, shape: 'boss' },
-  petricite: { id: 'petricite', name: 'Golem de pétricite', hp: 1150, speed: 0.42, armor: 0.25, gold: 280, leak: 12, size: 24, color: '#e6e9f0', boss: true, shape: 'boss' },
-  warbeast: { id: 'warbeast', name: 'Bête de guerre noxienne', hp: 1250, speed: 0.45, armor: 0.25, gold: 320, leak: 12, size: 24, color: '#8a1c2a', boss: true, shape: 'boss' },
-  spiritguard: { id: 'spiritguard', name: 'Gardien spirituel', hp: 1350, speed: 0.45, armor: 0.2, gold: 340, leak: 12, size: 24, color: '#ff9ed2', boss: true, shape: 'boss' },
-  automaton: { id: 'automaton', name: 'Automate hextech', hp: 1450, speed: 0.4, armor: 0.3, gold: 380, leak: 12, size: 24, color: '#c9a35a', boss: true, shape: 'boss' },
+  riftherald: { id: 'riftherald', name: 'Héraut de la Faille', hp: 900, speed: 0.45, armor: 0.2, gold: 200, leak: 12, size: 22, color: '#7d3cff', boss: true, shape: 'boss', ability: { name: 'Charge du Héraut', cd: 9, kind: 'charge', dur: 1.6, mult: 2.2 } },
+  baron: { id: 'baron', name: 'Baron Nashor', hp: 1000, speed: 0.45, armor: 0.2, gold: 250, leak: 12, size: 24, color: '#6a1b9a', boss: true, shape: 'boss', ability: { name: 'Souffle corrompu', cd: 12, kind: 'freeze', radius: 2.4, dur: 1.8 } },
+  poroking: { id: 'poroking', name: 'Roi Poro', hp: 1000, speed: 0.5, armor: 0.2, gold: 250, leak: 12, size: 24, color: '#f0f0f0', boss: true, shape: 'boss', ability: { name: 'Fanfare royale', cd: 11, kind: 'rally', radius: 3.5, dur: 3.5, mult: 1.6 } },
+  colossus: { id: 'colossus', name: 'Colosse de glace', hp: 1100, speed: 0.4, armor: 0.25, gold: 300, leak: 12, size: 24, color: '#8fd3ff', boss: true, shape: 'boss', ability: { name: 'Souffle glacé', cd: 12, kind: 'freeze', radius: 2.2, dur: 2 } },
+  sentinel: { id: 'sentinel', name: 'Sentinelle de Shurima', hp: 1200, speed: 0.4, armor: 0.25, gold: 350, leak: 12, size: 24, color: '#d4a537', boss: true, shape: 'boss', ability: { name: 'Garde du disque', cd: 10, kind: 'summon', id: 'super', n: 2 } },
+  fallenking: { id: 'fallenking', name: 'Spectre du Roi déchu', hp: 1300, speed: 0.42, armor: 0.25, gold: 400, leak: 12, size: 25, color: '#3dd6a3', boss: true, shape: 'boss', ability: { name: 'Brume noire', cd: 9, kind: 'summon', id: 'voidling', n: 4 } },
+  petricite: { id: 'petricite', name: 'Golem de pétricite', hp: 1150, speed: 0.42, armor: 0.25, gold: 280, leak: 12, size: 24, color: '#e6e9f0', boss: true, shape: 'boss', ability: { name: 'Peau de pétricite', cd: 11, kind: 'shield', hits: 8 } },
+  warbeast: { id: 'warbeast', name: 'Bête de guerre noxienne', hp: 1250, speed: 0.45, armor: 0.25, gold: 320, leak: 12, size: 24, color: '#8a1c2a', boss: true, shape: 'boss', ability: { name: 'Ruée de guerre', cd: 8, kind: 'charge', dur: 1.8, mult: 2.2 } },
+  spiritguard: { id: 'spiritguard', name: 'Gardien spirituel', hp: 1350, speed: 0.45, armor: 0.2, gold: 340, leak: 12, size: 24, color: '#ff9ed2', boss: true, shape: 'boss', ability: { name: 'Forme spirituelle', cd: 10, kind: 'phase', dur: 1.5 } },
+  automaton: { id: 'automaton', name: 'Automate hextech', hp: 1450, speed: 0.4, armor: 0.3, gold: 380, leak: 12, size: 24, color: '#c9a35a', boss: true, shape: 'boss', ability: { name: 'Champ de force', cd: 10, kind: 'shield', hits: 12 } },
 };
 
 export interface Trait { icon: string; name: string; desc: string }
@@ -68,6 +71,17 @@ export function enemyTraits(d: EnemyDef): Trait[] {
   if (d.regen) out.push({ icon: '💚', name: 'Régénération', desc: `Récupère ${pc(d.regen)} de ses PV par seconde. La brûlure l'en empêche.` });
   if (d.heal) out.push({ icon: '✚', name: 'Soigneur', desc: `Soigne les monstres proches de ${pc(d.heal.pct)} de leurs PV par seconde. À éliminer en premier.` });
   if (d.split) out.push({ icon: '✂️', name: 'Se divise', desc: `Libère ${d.split.n} ${ENEMIES[d.split.id].name.toLowerCase()}s en mourant.` });
+  const ab = d.ability;
+  if (ab) {
+    const what = ab.kind === 'summon' ? `invoque ${ab.n} ${ENEMIES[ab.id].name.toLowerCase()}s`
+      : ab.kind === 'charge' ? `fonce pendant ${ab.dur} s (vitesse ×${ab.mult}), insensible aux ralentissements`
+      : ab.kind === 'shield' ? `lève un bouclier qui bloque ${ab.hits} coups`
+      : ab.kind === 'freeze' ? `gèle les champions proches pendant ${ab.dur} s : ils n'attaquent plus`
+      : ab.kind === 'rally' ? `accélère les monstres proches (×${ab.mult}) pendant ${ab.dur} s`
+      : ab.kind === 'phase' ? `devient intangible ${ab.dur} s : aucun dégât ne passe`
+      : `soigne les monstres proches de ${pc(ab.pct)} de leurs PV`;
+    out.push({ icon: '⚡', name: ab.name, desc: `Toutes les ${ab.cd} s : ${what}.` });
+  }
   if (d.fireproof) out.push({ icon: '🔥', name: 'Ignifugé', desc: 'Immunisé aux brûlures.' });
   return out;
 }
