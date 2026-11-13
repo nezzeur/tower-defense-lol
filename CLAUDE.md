@@ -4,7 +4,7 @@ Personal, local-only LoL-themed tower defense (PokéPath-like progression). Orig
 
 ## Token budget (user priority)
 - Delegate implementation to a Sonnet subagent (`model: "sonnet"`), usually one, max 2-3. Opus: short brief, quick review, short summary.
-- Cheap checks: `npx tsc --noEmit && npx vite build`. Browser screenshots or balance sims only when really needed.
+- Cheap checks: `npm run check` (= `tsc --noEmit`, `vite build`, short sim). Browser screenshots or balance sims only when really needed.
 - Reply in French, briefly.
 
 ## Commands
@@ -14,11 +14,31 @@ Personal, local-only LoL-themed tower defense (PokéPath-like progression). Orig
 
 ## Layout
 - `src/game.ts` rules: stats, levels (max 150), stars, unlocks (`unlockReason`, `isArena`), economy `BALANCE`, waves, chests
-- `src/battle.ts` sim + HD render, lanes, tile features, turrets, drag-to-move. The rAF loop drives the sim (`advance`) for smooth motion; the 50 ms timer only takes over in a hidden tab. Render-only fields on `Tower`/`Enemy` (aim, swing, knock-back...) never feed the sim. Hit-stop, light pass (`screen` blend) and `store.data.lowFx` (reduced effects option)
+- `src/battle/` one battle on one map (import from `./battle`, i.e. `battle/index.ts`):
+  - `battle.ts` class `Battle`: board state, placement, saved teams, wave flow, modes, spells, blessings, main loop (`step`, rAF `frame` drives the sim, the 50 ms timer only takes over in a hidden tab)
+  - `model.ts` shapes and constants (`Enemy`, `Tower`, `Proj`, `Fx`, `TILE`, `SPELLS`, `PRIORITIES`, `TUNE`)
+  - `enemies.ts` spawn, movement, traits, boss abilities (`useAbility`), allied turrets
+  - `combat.ts` targeting, projectiles, `hit`, `damage`, `kill`, loot
+  - `ultimates.ts` aiming, `castUlt` per effect type, auto-cast
+  - `effects.ts` visual/sound cues fired by the sim (no-ops headless)
+  - `input.ts` pointer input on the canvas
+  - `render.ts` frame + visual-only animation (`animate`, `render`, weather `AMBIENT`), `units.ts` monsters and champions, `scenery.ts` portal, nexus, banners, cut-in, bolts
+  - Convention: module functions take the battle as first argument `bt`; `Battle` members are public for these modules only. Render-only fields on `Tower`/`Enemy` never feed the sim. `store.data.lowFx` = reduced effects
 - `src/ui/` screens: `index.ts` (router/header), `common.ts` (shared state `ui`, helpers), `atlas.ts`, `collection.ts`, `shop.ts` (+chest), `inventory.ts` (inventory + forge), `options.ts`, `starter.ts`, `bestiary.ts` (monsters met, from save `bestiary` id -> kills), `tutorial.ts` (one-time guided tips anchored to a selector: `TIPS` list with `when`/`done`, seen ids in save `tips`, `tutorialTick` runs on render and in `refreshLive`), `battleHud.ts`, `events.ts` (all DOM listeners)
 - `src/data/` champions (26), enemies, items, `maps.ts` (regions plan + hand maps + curve), `mapgen.ts` (seeded generator)
 - `src/art/` `color.ts` (shade), `glow.ts` (cached soft sprites for every glow/light/soft shadow — use it instead of `shadowBlur`), `vfx.ts` (`Vfx`: particles with physics, lights, ground marks, dying monsters; visual only, null in headless), `heroes.ts` (board champions: body per role + weapon + portrait head, `HERO_LOOK` weapon/shot/element per champion, `drawShot` projectiles), `mapHD.ts` terrain/landmarks (returns the map's light sources), `regionArt.ts` (per-region ground dressing, set pieces, colour grade; runtime weather/lights live in `battle.ts` `AMBIENT`), `creatures.ts` vector monsters, `worldArt.ts` atlas, `champArt.ts`
 - `scripts/sim.ts` balance bot; `public/mobs/` optional custom monster PNGs
+
+## Adding things
+- Champion: entry in `data/champions.ts` (base stats, `ult` rank upgrade, `active` ultimate using an existing `UltFx` kind) + key in `art/champArt.ts` `KEYS` + look in `art/heroes.ts` `HERO_LOOK`.
+- Monster: entry in `data/enemies.ts` (traits are plain fields) + art in `art/mobRegion.ts` (`REGION_SVG`, templates or `recolor`) + height/top in `art/creatures.ts` (`CREATURE_HEIGHT`, `TOP`, `FLOATERS`) + a wave slot in `REGION_ROSTER` (`game.ts`). New trait: field on `EnemyDef`, behaviour in `battle/enemies.ts` or `battle/combat.ts`, text in `enemyTraits`.
+- Boss ability: new `kind` in `Ability` (`types.ts`), a `case` in `useAbility` (`battle/enemies.ts`), a phrase in `enemyTraits`.
+- Ultimate effect type: new `kind` in `UltFx` (`types.ts`), a branch in `castUlt` (`battle/ultimates.ts`), a rule in `autoUlts`.
+- Item: `data/items.ts` (shop: `price`; forged: `craft` recipe). Material: `data/loot.ts`. Blessing: `data/boons.ts` (stat channel of `Battle.syn`, or a `special` handled in `Battle.pickBoon` / `statsAt`).
+- Region: plan in `data/maps.ts` (`REGION_PLANS`, `REGION_BOSSES`), roster in `game.ts`, look in `art/mapHD.ts` `LOOKS` + `art/regionArt.ts`, weather in `battle/render.ts` `AMBIENT`, music theme in `music.ts`, materials in `data/loot.ts`.
+- Screen: file in `ui/`, id in `Screen` (`ui/common.ts`), tab + route in `ui/index.ts`, clicks in `ui/events.ts` (one delegated listener on `data-*` attributes). Tip: entry in `ui/tutorial.ts` `TIPS`.
+- Saved field: add to `SaveData` + `fresh()` + a guard in `sanitize()` (`save.ts`) so old saves keep loading.
+- After any change: `npm run check` (typecheck, build, short headless sim).
 
 ## Game state
 - 5 regions ("villes"): Faille 5 maps, Demacia 6, Freljord 7, Noxus 8, Ionia 9. Regular maps 30 waves, last map = arena (40). 3★ on previous map opens next; arena opens next region.
