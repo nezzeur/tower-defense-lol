@@ -4,13 +4,13 @@ import { FEATURE_INFO } from '../art/mapArt';
 import { Battle, initials, PRIORITIES, SPELLS, type Enemy, type SpellId, type Tower } from '../battle';
 import { SYN_TIERS, synText, teamSynergies } from '../data/synergies';
 import type { Priority } from '../types';
-import { BOON_BY_ID, BOON_EVERY } from '../data/boons';
+import { BOON_BY_ID, BOON_CHANCE, BOONS } from '../data/boons';
 import { ENEMIES, enemyTraits } from '../data/enemies';
 import { lootRolls, lootTable, MAT_BY_ID, MATERIALS } from '../data/loot';
 import { matChip } from './inventory';
 import { MAP_BY_ID } from '../data/maps';
 import { REGIONS } from '../art/worldArt';
-import { champ, endlessUnlocked, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots } from '../game';
+import { champ, endlessLevelFactor, endlessRefLevel, endlessUnlocked, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots } from '../game';
 import { sfx } from '../audio';
 import { setMusic, setMusicIntensity } from '../music';
 import { persist, store } from '../save';
@@ -55,7 +55,7 @@ export function startBattle(mapId: string): void {
           <span class="small muted">Mode</span>
           <button class="chip" data-mode="normal" title="Les ${map.waves} vagues de la carte">Normal</button>
           <button class="chip" data-mode="boss" title="Commence directement à la vague ${map.waves}">Boss ⚔</button>
-          <button class="chip" data-mode="endless" title="Après la vague ${map.waves} : les vagues continuent sans fin, de plus en plus dures, avec le boss toutes les 10 vagues. Une bénédiction à choisir toutes les ${BOON_EVERY} vagues.">Infini ∞</button>
+          <button class="chip" data-mode="endless" title="Après la vague ${map.waves} : les vagues continuent sans fin, de plus en plus dures, avec le boss toutes les 10 vagues. Les ennemis sont plus résistants si ton équipe dépasse le niveau de la carte. Après chaque vague, une bénédiction peut apparaître.">Infini ∞</button>
         </div>
         <button class="btn start" id="b-start" data-startwave>Lancer la vague ▶</button>
       </div>
@@ -219,7 +219,8 @@ function wavePanel(b: Battle): string {
       <div class="hud-title">Vague</div>
       ${b.endless
         ? `<div class="wave-big"><b>∞ ${ew}</b><span>record ${store.data.endless[m.id] ?? 0}</span></div>
-           <div class="bar"><div style="width:${((ew % 10) / 10) * 100}%"></div></div>`
+           <div class="bar"><div style="width:${((ew % 10) / 10) * 100}%"></div></div>
+           <div class="small" title="Les ennemis de l'infini gagnent des PV quand ton équipe dépasse le niveau attendu sur cette carte (niveau ${Math.round(endlessRefLevel(m))}).">Équipe niv. <b>${Math.round(b.teamLevel())}</b> · ennemis <b>×${endlessLevelFactor(m, b.teamLevel()).toFixed(1)}</b> PV</div>`
         : `<div class="wave-big"><b>${b.wave}</b><span>/ ${m.waves}</span></div>
            <div class="bar"><div style="width:${(b.wave / m.waves) * 100}%"></div></div>`}
       ${b.waveActive ? `<div class="small">Ennemis restants <b>${remaining}</b> / ${b.waveTotal}</div>
@@ -234,7 +235,7 @@ function wavePanel(b: Battle): string {
       <div class="hud-title">Bénédictions</div>
       ${Object.keys(b.boons).length
         ? `<div class="boon-list">${Object.entries(b.boons).map(([id, n]) => `<span class="tagc" title="${esc(BOON_BY_ID[id].desc)}">${BOON_BY_ID[id].icon} ${esc(BOON_BY_ID[id].name)}${n > 1 ? ` ×${n}` : ''}</span>`).join('')}</div>`
-        : `<span class="small muted">Un bonus à choisir toutes les ${BOON_EVERY} vagues.</span>`}
+        : `<span class="small muted">${BOONS.length} bénédictions existent. Après chaque vague, ${Math.round(BOON_CHANCE * 100)} % de chance d'en recevoir une à choisir parmi 3.</span>`}
     </div>` : ''}
     <div class="hud-card">
       <div class="hud-title">Synergies</div>

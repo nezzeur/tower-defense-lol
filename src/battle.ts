@@ -10,12 +10,12 @@ import { Vfx } from './art/vfx';
 import type { MapLight } from './art/regionArt';
 import { sfx } from './audio';
 import { ENEMIES } from './data/enemies';
-import { BOON_AUTO_DELAY, BOON_BY_ID, BOON_EVERY, rollBoons, type BoonDef } from './data/boons';
+import { BOON_AUTO_DELAY, BOON_BY_ID, BOON_CHANCE, rollBoons, type BoonDef } from './data/boons';
 import { MAT_BY_ID, rollLoot } from './data/loot';
 import { teamSynergies, type SynStat } from './data/synergies';
 import { COLS, ROWS } from './data/maps';
 import {
-  buildWave, champ, computeStats, endlessUnlocked, goldScale, hpScale, level, MAX_LIVES, START_LIVES, teamSlots, ultRank, waveBonus,
+  buildWave, champ, computeStats, endlessHp, endlessUnlocked, goldScale, hpScale, level, MAX_LIVES, START_LIVES, teamSlots, ultRank, waveBonus,
   type Spawn,
 } from './game';
 import { persist, store } from './save';
@@ -566,6 +566,16 @@ export class Battle {
   /** Endless mode: the run starts after the map's last wave and only ends when the nexus falls. */
   endless = false;
 
+  /** Average level of the champions on the board. */
+  teamLevel(): number {
+    return this.towers.length ? this.towers.reduce((n, t) => n + level(t.def.id), 0) / this.towers.length : 1;
+  }
+
+  /** Enemy HP multiplier of the current wave (endless waves also scale with the team's level). */
+  waveHp(): number {
+    return this.endless && this.wave > this.map.waves ? endlessHp(this.map, this.endlessWave(), this.teamLevel()) : hpScale(this.map, this.wave);
+  }
+
   /** Waves survived in the current endless run. */
   endlessWave(): number {
     return Math.max(0, this.wave - this.map.waves);
@@ -987,7 +997,7 @@ export class Battle {
   /** Spawns a monster at the start of the next lane, or at a given point of a lane (splitting monsters). */
   private spawn(id: string, at?: { s: number; lane: number }): void {
     const def = ENEMIES[id];
-    const hp = def.hp * hpScale(this.map, this.wave);
+    const hp = def.hp * this.waveHp();
     const lane = at ? at.lane : this.spawnCount++ % this.lanes.length;
     const s0 = at?.s ?? 0;
     const p = this.posAt(s0, lane);
@@ -1063,7 +1073,7 @@ export class Battle {
       }
       if (!best) { tu.cd = 0.1; continue; }
       tu.cd = 1.4;
-      this.damage(best, ENEMIES.melee.hp * hpScale(this.map, this.wave) * 0.25, null, false);
+      this.damage(best, ENEMIES.melee.hp * this.waveHp() * 0.25, null, false);
       if (this.vfx) {
         this.fx.push({ kind: 'beam', x: tu.x, y: tu.y - 40, x2: best.x, y2: best.y, t: 0, max: 0.18, color: '#7fd8ff' });
         this.vfx.impact('spark', '#7fd8ff', best.x, best.y - 6, Math.atan2(best.y - tu.y + 40, best.x - tu.x), 1, best.y + 15);
@@ -1372,9 +1382,8 @@ export class Battle {
     const heal = this.towers.reduce((n, t) => n + (t.stats.livesPerWave ?? 0), 0) + (this.boons.ward ?? 0) * (BOON_BY_ID.ward.value ?? 0);
     this.lives = Math.min(MAX_LIVES, this.lives + heal);
     persist();
-    // Endless mode only: every few waves the run waits for the player to choose a blessing
-    const count = this.endlessWave();
-    if (this.endless && count > 0 && count % BOON_EVERY === 0) {
+    // Endless mode only: after any wave, a blessing may appear; the run then waits for the player's choice
+    if (this.endless && this.endlessWave() > 0 && Math.random() < BOON_CHANCE) {
       this.boonOffer = rollBoons();
       this.boonT = BOON_AUTO_DELAY;
       if (!this.visual) this.pickBoon();

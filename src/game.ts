@@ -25,8 +25,12 @@ export const BALANCE = {
   goldMultExp: 0.95,
   /** Kill gold growth per wave (linear). */
   goldPerWave: 0.03,
-  /** Endless mode: extra enemy HP growth per wave beyond the map's last one (compounding). */
-  endlessGrowth: 1.07,
+  /**
+   * Endless mode. Enemy HP = HP of the map's last wave x start x (1 + linear * n) x growth^n x level factor, n = endless wave.
+   * The level factor makes enemies tougher for an over-levelled team (levelShare of each level's damage gain is
+   * matched), so the mode stays tense, yet wave 200+ remains reachable with highly levelled champions and blessings.
+   */
+  endless: { start: 1.25, linear: 0.06, growth: 1.006, levelShare: 0.7, refLevel: 17, refLevelPerMap: 1.1 },
   chestBase: 120,
   chestGrowth: 1.45,
 };
@@ -79,8 +83,20 @@ export const isArena = (m: MapDef): boolean => {
   return i === MAPS.length - 1 || MAPS[i + 1].region !== m.region;
 };
 
-export const hpScale = (m: MapDef, w: number): number =>
-  m.mult * (1 + 0.1 * (w - 1)) * BALANCE.hpPerWave ** (w - 1) * (w > m.waves ? BALANCE.endlessGrowth ** (w - m.waves) : 1);
+export const hpScale = (m: MapDef, w: number): number => m.mult * (1 + 0.1 * (w - 1)) * BALANCE.hpPerWave ** (w - 1);
+
+/** Average champion level a team is expected to have when it clears this map (measured with the balance bot). */
+export const endlessRefLevel = (m: MapDef): number => BALANCE.endless.refLevel + BALANCE.endless.refLevelPerMap * Math.max(0, MAPS.indexOf(m));
+
+/** How much tougher endless enemies get because the team out-levels the map (1 = no bonus). */
+export const endlessLevelFactor = (m: MapDef, teamLevel: number): number =>
+  BALANCE.dmgPerLevel ** (BALANCE.endless.levelShare * Math.max(0, teamLevel - endlessRefLevel(m)));
+
+/** Enemy HP multiplier on endless wave n (1, 2, 3...) for a team of this average level. */
+export function endlessHp(m: MapDef, n: number, teamLevel: number): number {
+  const e = BALANCE.endless;
+  return hpScale(m, m.waves) * e.start * (1 + e.linear * n) * e.growth ** n * endlessLevelFactor(m, teamLevel);
+}
 export const goldScale = (m: MapDef, w: number): number => (1 + BALANCE.goldPerWave * w) * m.mult ** BALANCE.goldMultExp;
 export const waveBonus = (m: MapDef, w: number): number => Math.round((10 + 3 * w) * m.mult ** BALANCE.goldMultExp);
 

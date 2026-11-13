@@ -13,8 +13,8 @@ export interface BoonDef {
   special?: 'lives' | 'regen' | 'burn';
 }
 
-/** Waves between two offers. */
-export const BOON_EVERY = 5;
+/** Chance that a blessing is offered after each endless wave. */
+export const BOON_CHANCE = 0.25;
 /** Seconds before auto waves pick one for an absent player. */
 export const BOON_AUTO_DELAY = 8;
 
@@ -26,8 +26,6 @@ export const BOONS: BoonDef[] = [
   { id: 'focus', name: 'Concentration', icon: '🌀', desc: 'Les ultimes se rechargent 20 % plus vite', stat: 'ultCd', value: 0.2 },
   { id: 'giant', name: 'Tueur de géants', icon: '🗡️', desc: '+20 % de dégâts contre les boss', stat: 'boss', value: 0.2 },
   { id: 'pierce', name: 'Perce-armure', icon: '⛏️', desc: 'Ignore 10 % d\'armure ennemie', stat: 'armorShred', value: 0.1 },
-  { id: 'frost', name: 'Givre', icon: '❄️', desc: 'Les ralentissements de l\'équipe sont 10 % plus forts', stat: 'slow', value: 0.1 },
-  { id: 'blast', name: 'Onde de choc', icon: '💥', desc: '+15 % de rayon pour les attaques de zone', stat: 'splash', value: 0.15 },
   { id: 'ember', name: 'Braise', icon: '🔥', desc: 'Tous les coups brûlent : +12 % des dégâts par seconde pendant 3 s', special: 'burn', value: 0.12 },
   { id: 'heal', name: 'Second souffle', icon: '💚', desc: '+6 vies tout de suite', special: 'lives', value: 6 },
   { id: 'ward', name: 'Rempart', icon: '🛡️', desc: '+1 vie à chaque vague terminée', special: 'regen', value: 1 },
