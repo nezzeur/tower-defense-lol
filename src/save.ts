@@ -21,6 +21,11 @@ export interface SaveData {
   /** Endless mode: most waves survived beyond the map's last one, per map. */
   endless: Record<string, number>;
   layouts: Record<string, Placement[]>;
+  /** Saved teams per map (3 slots) and the slot in use; `layouts` holds the active one. */
+  teams: Record<string, Placement[][]>;
+  teamSlot: Record<string, number>;
+  /** Monsters met so far: id -> number killed. */
+  bestiary: Record<string, number>;
   chestsOpened: number;
   /** Pending chest choice (champion ids); kept in the save so a reload can't reroll it. */
   chestOffer: string[] | null;
@@ -50,7 +55,7 @@ const KEY = 'riftdefenders.save.v1' + (slot ? `:${slot}` : '');
 
 function fresh(): SaveData {
   return {
-    v: 1, gold: 0, owned: [], levels: {}, stacks: {}, items: [], mats: {}, equip: {}, best: {}, endless: {}, layouts: {}, priorities: {},
+    v: 1, gold: 0, owned: [], levels: {}, stacks: {}, items: [], mats: {}, equip: {}, best: {}, endless: {}, layouts: {}, teams: {}, teamSlot: {}, bestiary: {}, priorities: {},
     chestsOpened: 0, chestOffer: null, chestsSinceEpic: 0, speed: 1, auto: false, autoUlt: false, lowFx: false, kills: 0, runs: 0, volume: 0.5, muted: false, music: 0.35,
   };
 }
@@ -70,6 +75,9 @@ function sanitize(raw: unknown): SaveData {
   if (d.v !== 1 || !Array.isArray(d.owned) || typeof d.gold !== 'number') throw new Error('bad save');
   if (typeof d.volume !== 'number' || !(d.volume >= 0 && d.volume <= 1)) d.volume = 0.5;
   d.muted = d.muted === true;
+  for (const k of ['teams', 'teamSlot', 'bestiary'] as const) {
+    if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) (d as unknown as Record<string, unknown>)[k] = {};
+  }
   if (d.tips !== undefined && !Array.isArray(d.tips)) d.tips = undefined;
   if (!d.endless || typeof d.endless !== 'object' || Array.isArray(d.endless)) d.endless = {};
   if (typeof d.music !== 'number' || !(d.music >= 0 && d.music <= 1)) d.music = 0.35;

@@ -134,6 +134,7 @@ app.addEventListener('click', (e) => {
     return renderSide();
   }
   if (d.ult) { const t = b.towers.find((x) => x.def.id === d.ult); if (t) b.requestUlt(t); return refreshLive(); }
+  if (d.team) { if (!b.switchTeam(Number(d.team)) && b.waveActive) flash('Change d\'équipe entre deux vagues.'); return renderSide(); }
   if (d.boon) { b.pickBoon(d.boon); return renderSide(); }
   if (d.deselectEnemy !== undefined) { b.selectedEnemy = null; return renderSide(); }
   if (d.deselect !== undefined) { b.selectedTower = null; return renderSide(); }

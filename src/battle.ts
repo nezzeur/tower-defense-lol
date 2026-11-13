@@ -27,6 +27,8 @@ export const H = ROWS * TILE;
 const STEP = 1 / 60;
 /** Seconds a champion takes to drop onto its tile, and the moment its feet touch the ground. */
 const SPAWN = 0.38, LAND = SPAWN * 0.7;
+/** Saved teams per map. */
+export const TEAM_SLOTS = 3;
 /** Seconds the ultimate cut-in stays on screen. */
 const CUTIN = 1.15;
 
@@ -200,6 +202,11 @@ export class Battle {
   runKills = 0;
   runGold = 0;
   runTime = 0;
+  /** More run statistics for the end screen. */
+  ultCasts = 0;
+  livesLost = 0;
+  epicKills = 0;
+  bestHit = 0;
   /** Materials looted this run (id -> amount). */
   runLoot: Record<string, number> = {};
   waveTotal = 0;
@@ -409,8 +416,31 @@ export class Battle {
   }
 
   private saveLayout(): void {
-    store.data.layouts[this.map.id] = this.towers.map((t) => ({ id: t.def.id, c: t.c, r: t.r }));
+    const layout = this.towers.map((t) => ({ id: t.def.id, c: t.c, r: t.r }));
+    store.data.layouts[this.map.id] = layout;
+    (store.data.teams[this.map.id] ??= [])[this.teamSlot()] = layout;
     persist();
+  }
+
+  /** Saved team in use on this map (0..TEAM_SLOTS-1). */
+  teamSlot(): number {
+    return store.data.teamSlot[this.map.id] ?? 0;
+  }
+
+  /** Swaps the whole board for another saved team (between waves only). */
+  switchTeam(slot: number): boolean {
+    if (this.waveActive || slot === this.teamSlot() || slot < 0 || slot >= TEAM_SLOTS) return false;
+    this.saveLayout();
+    store.data.teamSlot[this.map.id] = slot;
+    const next = store.data.teams[this.map.id]?.[slot] ?? [];
+    this.towers = [];
+    this.selectedTower = null;
+    this.aiming = null;
+    for (const p of next) if (store.data.owned.includes(p.id)) this.place(p.id, p.c, p.r);
+    this.refreshStats();
+    this.saveLayout();
+    this.ev.onChange();
+    return true;
   }
 
   private restoreLayout(): void {
@@ -667,6 +697,7 @@ export class Battle {
     }
     this.vfx?.clear();
     this.runKills = this.runGold = this.runTime = 0;
+    this.ultCasts = this.livesLost = this.epicKills = this.bestHit = 0;
     this.runLoot = {};
     this.boons = {};
     this.boonOffer = null;
@@ -879,6 +910,7 @@ export class Battle {
       }
     }
     t.ultCd = u.cd;
+    this.ultCasts++;
     t.flash = 0.3;
     t.ultT = 0;
     if (vis) {
@@ -1016,6 +1048,7 @@ export class Battle {
       kx: 0, ky: 0, sq: 0, born: at ? 0.2 : 0, shield: def.shield ?? 0, healed: 0,
       abT: (def.ability?.cd ?? 0) * 0.6, chargeT: 0, phaseT: 0, hasteT: 0, haste: 1,
     });
+    store.data.bestiary[id] ??= 0;
   }
 
   /** How much of a slow or stun gets through this monster's tenacity (0 = immune). */
@@ -1063,6 +1096,7 @@ export class Battle {
       e.y = p.y;
       if (e.s >= this.lanes[e.lane].len) {
         this.lives -= e.def.leak;
+        this.livesLost += e.def.leak;
         if (this.visual) sfx('lifeLost');
         this.fx.push({ kind: 'ring', x: e.x, y: e.y, r: 40, t: 0, max: 0.5, color: '#ff4d4d' });
         this.nexusHurt = 0.5;
@@ -1400,6 +1434,7 @@ export class Battle {
     if (e.dead || e.phaseT > 0) return;
     const dealt = trueDmg ? amount : amount * (1 - Math.max(0, e.def.armor - (this.syn.armorShred ?? 0)));
     if (src) src.dmgDone += Math.min(dealt, Math.max(0, e.hp));
+    if (dealt > this.bestHit) this.bestHit = dealt;
     e.hp -= dealt;
     if (e.hp <= 0) this.kill(e, src);
   }
@@ -1410,6 +1445,8 @@ export class Battle {
     const gold = Math.max(1, Math.round(e.def.gold * goldScale(this.map, this.wave) * (1 + (src?.stats.killGold ?? 0) + (this.syn.gold ?? 0))));
     store.data.gold += gold;
     store.data.kills++;
+    store.data.bestiary[e.def.id] = (store.data.bestiary[e.def.id] ?? 0) + 1;
+    if (e.def.shape === 'boss') this.epicKills++;
     this.runKills++;
     this.runGold += gold;
     if (e.def.boss || e.def.shape === 'boss') {

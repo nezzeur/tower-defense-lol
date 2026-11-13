@@ -36,3 +36,15 @@
 .forge-foot select { font-size: 12px; padding: 3px 6px; max-width: 160px; }
 .result-loot { display: flex; justify-content: center; margin: 4px 0 10px; }
 .result-loot .mat-row { justify-content: center; max-width: 420px; }
+
+/* Bestiary */
+.bestiary { display: flex; flex-direction: column; gap: 6px; }
+.beast-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 10px; }
+.beast { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 10px 12px; background: var(--fill); border: 1px solid var(--gold5); }
+.beast.epic { border-color: var(--gold3); } .beast.boss { border-color: var(--r3); }
+.beast.unknown { opacity: 0.5; }
+.beast-ico { width: 72px; height: 72px; display: grid; place-items: center; background: var(--bg2); border: 1px solid var(--gold4); font: 700 28px var(--font-head); color: var(--muted); }
+.beast-ico img { width: 72px; height: 72px; }
+.beast-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.beast-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.beast-h b { font: 700 14px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; }

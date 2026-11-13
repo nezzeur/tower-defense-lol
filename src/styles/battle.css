@@ -190,3 +190,15 @@
 .boon-ico { font-size: 30px; line-height: 1; }
 .boon-list { display: flex; flex-wrap: wrap; gap: 4px; }
 @media (max-width: 640px) { .boon-row { grid-template-columns: 1fr; } }
+
+/* Saved teams and end-of-run statistics */
+.team-sets { display: inline-flex; gap: 3px; }
+.team-sets .chip { padding: 1px 8px; font-size: 11px; }
+.end-stats { grid-template-columns: repeat(3, 1fr); margin: 10px 0; text-align: left; }
+.end-table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 12px; text-align: right; }
+.end-table th { font: 700 10px var(--font-head); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 3px 6px; border-bottom: 1px solid var(--gold4); }
+.end-table td { padding: 3px 6px; border-bottom: 1px solid var(--gold5); }
+.end-table th:first-child, .end-table td:first-child { text-align: left; }
+.end-table img { width: 20px; height: 20px; vertical-align: middle; margin-right: 4px; }
+.end-table i { font-style: normal; color: var(--muted); }
+.result { max-height: 96%; overflow-y: auto; }

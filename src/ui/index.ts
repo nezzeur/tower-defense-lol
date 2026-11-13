@@ -5,6 +5,7 @@ import { champsScreen } from './collection';
 import { mountWorld, mapsScreen } from './atlas';
 import { forgeScreen, inventoryScreen } from './inventory';
 import { optionsScreen } from './options';
+import { bestiaryScreen } from './bestiary';
 import { shopScreen } from './shop';
 import { renderStarter } from './starter';
 import './events';
@@ -14,7 +15,7 @@ import { tutorialTick } from './tutorial';
 export { statLines } from './common';
 
 function header(): string {
-  const tabs: [Screen, string][] = [['maps', 'Cartes'], ['champions', 'Champions'], ['shop', 'Boutique'], ['inventory', 'Inventaire'], ['forge', 'Forge'], ['options', 'Options']];
+  const tabs: [Screen, string][] = [['maps', 'Cartes'], ['champions', 'Champions'], ['shop', 'Boutique'], ['inventory', 'Inventaire'], ['forge', 'Forge'], ['bestiary', 'Bestiaire'], ['options', 'Options']];
   return `<header class="top">
     <div class="logo">RIFT<span>DEFENDERS</span></div>
     <nav>${tabs.map(([id, label]) => `<button class="tab ${ui.screen === id ? 'on' : ''}" data-nav="${id}">${label}</button>`).join('')}</nav>
@@ -27,7 +28,7 @@ export function render(): void {
   if (!store.data.owned.length) return renderStarter();
   if (ui.screen === 'battle') return;
   const body = ui.screen === 'maps' ? mapsScreen() : ui.screen === 'champions' ? champsScreen()
-    : ui.screen === 'shop' ? shopScreen() : ui.screen === 'inventory' ? inventoryScreen() : ui.screen === 'forge' ? forgeScreen() : optionsScreen();
+    : ui.screen === 'shop' ? shopScreen() : ui.screen === 'inventory' ? inventoryScreen() : ui.screen === 'forge' ? forgeScreen() : ui.screen === 'bestiary' ? bestiaryScreen() : optionsScreen();
   app.innerHTML = header() + `<main class="screen">${body}</main>`;
   if (ui.screen === 'maps') mountWorld();
   tutorialTick();

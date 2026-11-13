@@ -1,7 +1,7 @@
 import { squareUrl, splashUrl } from '../art/champArt';
 import { CREATURE_HEIGHT, creatureReady, drawCreature } from '../art/creatures';
 import { FEATURE_INFO } from '../art/mapArt';
-import { Battle, initials, PRIORITIES, SPELLS, type Enemy, type SpellId, type Tower } from '../battle';
+import { Battle, initials, PRIORITIES, SPELLS, TEAM_SLOTS, type Enemy, type SpellId, type Tower } from '../battle';
 import { SYN_TIERS, synText, teamSynergies } from '../data/synergies';
 import type { Priority } from '../types';
 import { BOON_BY_ID, BOON_CHANCE, BOONS } from '../data/boons';
@@ -47,7 +47,9 @@ export function startBattle(mapId: string): void {
         <button class="spell" data-spell="${id}" title="${esc(SPELLS[id].name)} : ${esc(SPELLS[id].desc)}">
           <span>${SPELLS[id].icon}</span><i id="cd-${id}"></i></button>`).join('')}</div>
       <div class="team-wrap">
-        <div class="team-h"><span>Équipe</span><b id="b-slots"></b><span class="hint" id="b-hint"></span></div>
+        <div class="team-h"><span>Équipe</span>
+          <span class="team-sets" id="b-teams" title="3 équipes enregistrées par carte. Changer d'équipe remplace tous les champions posés (entre deux vagues).">${Array.from({ length: TEAM_SLOTS }, (_, i) => `<button class="chip" data-team="${i}">${'ABC'[i]}</button>`).join('')}</span>
+          <b id="b-slots"></b><span class="hint" id="b-hint"></span></div>
         <div class="ults" id="ults"></div>
         <div class="team" id="team"></div>
       </div>
@@ -114,7 +116,7 @@ export function renderSide(): void {
 
 const creatureIcons = new Map<string, string>();
 /** Small rendered portrait of an enemy creature, for HUD lists. */
-function creatureIcon(id: string): string {
+export function creatureIcon(id: string): string {
   let url = creatureIcons.get(id);
   if (!url) {
     const c = document.createElement('canvas');
@@ -369,6 +371,10 @@ export function refreshLive(): void {
   const first = b.wave === 0 && !b.waveActive;
   start.textContent = b.waveActive ? `Vague ${shown(b.wave)} en cours…`
     : first && b.endless ? 'Lancer le mode infini ▶' : first && b.bossMode ? `Défier le boss (vague ${b.map.waves}) ▶` : `Lancer la vague ${shown(b.wave + 1)} ▶`;
+  document.querySelectorAll<HTMLButtonElement>('#b-teams [data-team]').forEach((el) => {
+    el.classList.toggle('on', Number(el.dataset.team) === b.teamSlot());
+    el.disabled = b.waveActive;
+  });
   // Mode selector: only before the first wave, only the modes this map has opened
   const canBoss = b.canChallengeBoss(), canEndless = endlessUnlocked(b.map.id);
   document.getElementById('b-modes')!.classList.toggle('hidden', !first || b.over || (!canBoss && !canEndless));
@@ -381,6 +387,28 @@ export function refreshLive(): void {
   set('b-hint', b.aiming ? `${b.aiming.def.active.name} : clique sur la carte pour viser · reclique le bouton pour viser tout seul · clic droit pour annuler`
     : !b.towers.length ? 'Place au moins un champion avant de lancer la vague.'
     : store.data.auto ? (b.wave === 0 && !b.waveActive ? 'Vagues auto : choisis ton mode puis lance la première vague, la suite s\'enchaîne.' : 'Mode auto : vagues et redémarrages automatiques.') : '');
+}
+
+/** End-of-run summary: totals, then what each champion did. */
+function runStats(b: Battle): string {
+  const total = Math.max(1, b.towers.reduce((n, t) => n + t.dmgDone, 0));
+  const dps = b.runTime > 0 ? total / b.runTime : 0;
+  const cell = (label: string, value: string) => `<div><span>${label}</span><b>${value}</b></div>`;
+  const rows = [...b.towers].sort((x, y) => y.dmgDone - x.dmgDone).map((t) => `<tr>
+    <td><img src="${squareUrl(t.def.id)}" alt=""> ${esc(t.def.name)} <i>niv. ${level(t.def.id)}</i></td>
+    <td>${fmt(t.dmgDone)}</td><td>${Math.round((t.dmgDone / total) * 100)} %</td><td>${t.kills}</td></tr>`).join('');
+  return `<div class="run-stats end-stats">
+      ${cell('Vagues', b.endless ? `∞ ${Math.max(0, b.endlessWave() - (b.over && b.lives <= 0 ? 1 : 0))}` : String(b.wave))}
+      ${cell('Durée', fmtTime(b.runTime))}
+      ${cell('Éliminations', String(b.runKills))}
+      ${cell('Épiques et boss', String(b.epicKills))}
+      ${cell('Or gagné', fmt(b.runGold))}
+      ${cell('Dégâts / s', fmt(dps))}
+      ${cell('Plus gros coup', fmt(b.bestHit))}
+      ${cell('Ultimes lancés', String(b.ultCasts))}
+      ${cell('Vies perdues', String(b.livesLost))}
+    </div>
+    ${rows ? `<table class="end-table"><thead><tr><th>Champion</th><th>Dégâts</th><th>Part</th><th>Élim.</th></tr></thead><tbody>${rows}</tbody></table>` : ''}`;
 }
 
 function showResult(win: boolean, wave: number): void {
@@ -408,6 +436,7 @@ function showResult(win: boolean, wave: number): void {
     ${win && endlessUnlocked(ui.battle.map.id) ? '<p class="small">Le mode infini de cette carte est ouvert.</p>' : ''}
     <p class="small muted">Ton or, tes niveaux et tes objets sont conservés.</p>
     ${reward}
+    ${runStats(ui.battle)}
     ${lootRow(ui.battle.runLoot) ? `<div class="small muted">Butin de la partie</div><div class="result-loot">${lootRow(ui.battle.runLoot)}</div>` : ''}
     <div class="row"><button class="btn gold" data-mode="normal">Rejouer</button>
       ${endlessUnlocked(ui.battle.map.id) ? '<button class="btn boss" data-mode="endless">Mode infini ∞</button>' : ''}
