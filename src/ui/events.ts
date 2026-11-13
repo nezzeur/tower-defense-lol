@@ -4,6 +4,7 @@ import { champ, claimChest, craftItem, openChest, level, teamSlots, tryLevelUp, 
 import { playChestOpening } from '../art/chest';
 import { applyVolume, sfx } from '../audio';
 import { applyMusicVolume } from '../music';
+import { resetTutorial } from './tutorial';
 import type { SpellId } from '../battle';
 import type { Priority } from '../types';
 import { exportSave, importSave, persist, resetSave, store } from '../save';
@@ -83,6 +84,7 @@ app.addEventListener('click', (e) => {
     }
     return render();
   }
+  if (d.tuto !== undefined) { resetTutorial(); flash('Tutoriel réactivé'); return render(); }
   if (d.export !== undefined) { (document.getElementById('save-out') as HTMLTextAreaElement).value = exportSave(); return; }
   if (d.copy !== undefined) {
     const out = document.getElementById('save-out') as HTMLTextAreaElement;

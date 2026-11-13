@@ -17,6 +17,10 @@ export function optionsScreen(): string {
       <label class="auto"><input type="checkbox" id="opt-lowfx" ${d.lowFx ? 'checked' : ''}> Effets réduits</label>
       <p class="muted small">Moins de particules, pas de lumières ni de traces au sol. À cocher si les combats saccadent.</p>
     </section>
+    <section class="card"><h3>Aide</h3>
+      <div class="row"><button class="btn" data-tuto>Revoir le tutoriel</button>
+        <span class="small muted">Réaffiche toutes les bulles d'aide, sur les menus comme en combat.</span></div>
+    </section>
     <section class="card"><h3>Sauvegarde</h3>
       <p class="muted small">Sauvegarde automatique dans le navigateur. Exporte régulièrement : vider les données du navigateur efface ta progression.</p>
       <div class="row"><button class="btn" data-export>Exporter</button><button class="btn" data-copy>Copier</button></div>

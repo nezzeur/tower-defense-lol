@@ -40,6 +40,8 @@ export interface SaveData {
   muted: boolean;
   /** Music volume 0-1. */
   music: number;
+  /** Guided tips already seen (undefined on saves from before the tutorial). */
+  tips?: string[];
 }
 
 // ?save=<name> uses a separate save slot (testing without touching real progress).
@@ -68,6 +70,7 @@ function sanitize(raw: unknown): SaveData {
   if (d.v !== 1 || !Array.isArray(d.owned) || typeof d.gold !== 'number') throw new Error('bad save');
   if (typeof d.volume !== 'number' || !(d.volume >= 0 && d.volume <= 1)) d.volume = 0.5;
   d.muted = d.muted === true;
+  if (d.tips !== undefined && !Array.isArray(d.tips)) d.tips = undefined;
   if (!d.endless || typeof d.endless !== 'object' || Array.isArray(d.endless)) d.endless = {};
   if (typeof d.music !== 'number' || !(d.music >= 0 && d.music <= 1)) d.music = 0.35;
   if (!d.mats || typeof d.mats !== 'object' || Array.isArray(d.mats)) d.mats = {};

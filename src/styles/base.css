@@ -214,3 +214,18 @@ input[type='checkbox'] { accent-color: var(--teal1); }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 input[type='range'] { accent-color: var(--teal1); }
+
+/* Guided tips */
+.tip { position: fixed; z-index: 60; width: min(340px, calc(100vw - 16px)); padding: 12px 14px; background: linear-gradient(var(--bg2), var(--bg0)); border: 1px solid var(--teal1); box-shadow: 0 0 0 1px var(--bg0), 0 8px 26px rgba(0, 0, 0, 0.6), 0 0 18px rgba(10, 200, 185, 0.35); animation: fadeUp 0.25s ease both; }
+.tip b { display: block; font: 700 14px var(--font-head); letter-spacing: 0.1em; text-transform: uppercase; color: var(--teal1); margin-bottom: 4px; }
+.tip p { margin: 0 0 10px; font-size: 13px; line-height: 1.45; }
+.tip-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tip-skip { background: none; border: none; padding: 0; font-size: 12px; color: var(--muted); text-decoration: underline; }
+.tip-skip:hover { color: var(--gold1); }
+.tip::after { content: ''; position: absolute; left: var(--ax, 50%); width: 12px; height: 12px; margin-left: -6px; background: var(--bg0); border: 1px solid var(--teal1); transform: rotate(45deg); }
+.tip[data-side='top']::after { bottom: -7px; border-top: none; border-left: none; }
+.tip[data-side='bottom']::after { top: -7px; border-bottom: none; border-right: none; background: var(--bg2); }
+.tip[data-side='none']::after { display: none; }
+.tip-ring { position: fixed; z-index: 59; pointer-events: none; border: 2px solid var(--teal1); box-shadow: 0 0 16px rgba(10, 200, 185, 0.6), inset 0 0 12px rgba(10, 200, 185, 0.25); animation: tipPulse 1.4s ease-in-out infinite; }
+@keyframes tipPulse { 50% { box-shadow: 0 0 26px rgba(10, 200, 185, 0.9), inset 0 0 16px rgba(10, 200, 185, 0.4); } }
+@media (prefers-reduced-motion: reduce) { .tip, .tip-ring { animation: none; } }

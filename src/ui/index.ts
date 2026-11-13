@@ -9,6 +9,7 @@ import { shopScreen } from './shop';
 import { renderStarter } from './starter';
 import './events';
 import { setMusic } from '../music';
+import { tutorialTick } from './tutorial';
 
 export { statLines } from './common';
 
@@ -29,6 +30,7 @@ export function render(): void {
     : ui.screen === 'shop' ? shopScreen() : ui.screen === 'inventory' ? inventoryScreen() : ui.screen === 'forge' ? forgeScreen() : optionsScreen();
   app.innerHTML = header() + `<main class="screen">${body}</main>`;
   if (ui.screen === 'maps') mountWorld();
+  tutorialTick();
 }
 
 export function go(s: Screen): void {

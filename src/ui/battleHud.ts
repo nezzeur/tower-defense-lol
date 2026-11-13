@@ -13,6 +13,7 @@ import { REGIONS } from '../art/worldArt';
 import { champ, endlessLevelFactor, endlessRefLevel, endlessUnlocked, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots } from '../game';
 import { sfx } from '../audio';
 import { setMusic, setMusicIntensity } from '../music';
+import { tutorialTick } from './tutorial';
 import { persist, store } from '../save';
 import type { MapDef } from '../types';
 import { app, esc, itemSelect, abilityRow, levelButtons, mapThumb, portrait, starRow, statLines, ui, ultButton } from './common';
@@ -376,6 +377,7 @@ export function refreshLive(): void {
     el.classList.toggle('on', m === b.mode());
     el.classList.toggle('hidden', (m === 'boss' && !canBoss) || (m === 'endless' && !canEndless));
   });
+  tutorialTick();
   set('b-hint', b.aiming ? `${b.aiming.def.active.name} : clique sur la carte pour viser · reclique le bouton pour viser tout seul · clic droit pour annuler`
     : !b.towers.length ? 'Place au moins un champion avant de lancer la vague.'
     : store.data.auto ? (b.wave === 0 && !b.waveActive ? 'Vagues auto : choisis ton mode puis lance la première vague, la suite s\'enchaîne.' : 'Mode auto : vagues et redémarrages automatiques.') : '');
