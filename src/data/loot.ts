@@ -2,7 +2,7 @@ import type { EnemyDef, MaterialDef } from '../types';
 
 /** Fixed drop chance per roll, by material rarity (1 commun .. 4 légendaire). */
 export const DROP_CHANCE: Record<number, number> = { 1: 0.05, 2: 0.015, 3: 0.004, 4: 0.002 };
-export const MAT_RARITY = ['', 'Commun', 'Rare', 'Épique', 'Légendaire'];
+export const MAT_RARITY = ['', 'Commun', 'Rare', 'Épique', 'Légendaire', 'Mythique'];
 
 export const MATERIALS: MaterialDef[] = [
   // Dropped everywhere, by monster family
@@ -28,7 +28,16 @@ export const MATERIALS: MaterialDef[] = [
   { id: 'fleur', name: "Fleur d'esprit", icon: '🌸', rarity: 1, region: 'ionia', desc: 'Ionia.' },
   { id: 'soie', name: "Soie d'Ionia", icon: '🎀', rarity: 2, region: 'ionia', desc: 'Ionia.' },
   { id: 'esprit', name: "Essence d'esprit", icon: '🦊', rarity: 3, region: 'ionia', desc: 'Ionia.' },
+  // Relics: only from the endless-mode boss of each region (see ENDLESS_LOOT in game.ts), never guaranteed
+  { id: 'r_rift', name: 'Œil du Baron', icon: '👁️', rarity: 5, relic: 'rift', desc: 'Boss du mode infini — Faille de l\'invocateur.' },
+  { id: 'r_demacia', name: 'Cœur de pétricite', icon: '🤍', rarity: 5, relic: 'demacia', desc: 'Boss du mode infini — Demacia.' },
+  { id: 'r_freljord', name: 'Éclat de glace éternelle', icon: '💎', rarity: 5, relic: 'freljord', desc: 'Boss du mode infini — Freljord.' },
+  { id: 'r_noxus', name: 'Croc de bête de guerre', icon: '🩸', rarity: 5, relic: 'noxus', desc: 'Boss du mode infini — Noxus.' },
+  { id: 'r_ionia', name: 'Larme d\'esprit', icon: '💧', rarity: 5, relic: 'ionia', desc: 'Boss du mode infini — Ionia.' },
 ];
+
+/** Relic dropped by the endless-mode boss of a region, if any. */
+export const relicOf = (region: string): MaterialDef | undefined => MATERIALS.find((m) => m.relic === region);
 
 export const MAT_BY_ID: Record<string, MaterialDef> = Object.fromEntries(MATERIALS.map((m) => [m.id, m]));
 
@@ -41,7 +50,7 @@ export function lootRolls(e: EnemyDef): number {
 
 /** Materials this monster can drop on a map of the given region. */
 export function lootTable(e: EnemyDef, region: string): MaterialDef[] {
-  return MATERIALS.filter((m) => m.region
+  return MATERIALS.filter((m) => m.relic ? false : m.region
     ? m.region === region
     : m.from!.includes('any') || m.from!.includes(e.id) || (!!e.boss && m.from!.includes('boss')));
 }

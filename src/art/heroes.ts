@@ -44,6 +44,7 @@ export const HERO_LOOK: Record<string, HeroLook> = {
   darius: L('axe', 'slash', 'fire'),
   ahri: L('orb', 'orb', 'magic'),
   jayce: L('cannon', 'bolt', 'spark'),
+  lillia: L('staff', 'orb', 'magic'),
 };
 
 const DEFAULT_LOOK: Record<Role, HeroLook> = {

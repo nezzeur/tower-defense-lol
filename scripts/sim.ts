@@ -117,6 +117,9 @@ function useSpells(b: Battle): void {
   if (TUNE.ult > 0) for (const t of b.towers) if (b.ultReady(t)) b.castUlt(t);
 }
 
+/** Average level of the placed team when each map was first cleared (ENDLESS=1 prints it to calibrate endless mode). */
+const clearLevel: Record<string, number> = {};
+
 function play(m: MapDef, boss = false): { wave: number; win: boolean } {
   let result = { wave: 0, win: false };
   const b = new Battle(m, { onChange: () => {}, onEnd: (win, wave) => { result = { win, wave }; } }, true);
@@ -137,6 +140,7 @@ function play(m: MapDef, boss = false): { wave: number; win: boolean } {
       b.startWave();
     }
   }
+  if (result.win && clearLevel[m.id] === undefined) clearLevel[m.id] = b.teamLevel();
   return result;
 }
 
@@ -174,3 +178,31 @@ while (time < maxHours * 3600) {
 
 console.log(milestones.join('\n'));
 console.log(`runs ${runs}, game time ${hms(time)}, gold left ${Math.round(store.data.gold)}`);
+
+// ---------- Endless (ENDLESS=1): after the campaign, how far does the same save get in endless mode? ----------
+
+/** Plays endless mode on a map with the team as it is (no spending between waves); returns the waves survived. */
+function playEndless(m: MapDef): { waves: number; team: string } {
+  const b = new Battle(m, { onChange: () => {}, onEnd: () => {} }, true);
+  fillTowers(b, m, pathSamples(m));
+  b.setMode('endless');
+  b.startWave();
+  while (!b.over && b.endlessWave() < 400) {
+    b.step(DT);
+    useSpells(b);
+    if (!b.waveActive && !b.over) b.startWave();
+  }
+  return { waves: Math.max(0, b.endlessWave() - 1), team: b.towers.map((t) => `${t.def.id}${level(t.def.id)}`).join(' ') };
+}
+
+if (process.env.ENDLESS) {
+  // ENDLESS_LVL=<n>: probe with every champion at that level instead of the bot's own levels
+  if (process.env.ENDLESS_LVL) for (const id of store.data.owned) store.data.levels[id] = Number(process.env.ENDLESS_LVL);
+  console.log('team level at first clear, by map index: ' + MAPS.map((m) => Math.round(clearLevel[m.id] ?? 0)).join(' '));
+  for (const i of [0, 4, 10, 17, 25, MAPS.length - 1]) {
+    const m = MAPS[i];
+    if ((store.data.best[m.id] ?? 0) < m.waves) continue;
+    const r = playEndless(m);
+    console.log(`endless ${m.name.padEnd(22)} -> ${String(r.waves).padStart(3)} waves   [${r.team}]`);
+  }
+}

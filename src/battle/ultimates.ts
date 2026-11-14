@@ -149,7 +149,7 @@ export function castUlt(bt: Battle, t: Tower, at?: { x: number; y: number }): bo
     const target = alive.reduce((a, b) => (b.hp > a.hp ? b : a));
     const boss = target.def.boss ? t.stats.bossMult ?? 1 : 1;
     damage(bt, target, dmg * fx.mult * boss, t, false);
-    damage(bt, target, target.maxHp * fx.pct * (target.def.boss ? 0.5 : 1), t, true);
+    damage(bt, target, target.maxHp * fx.pct * bt.pctHpScale() * (target.def.boss ? 0.5 : 1), t, true);
     if (vis) {
       bt.fx.push({ kind: 'beam', x: t.x, y: t.y - 14, x2: target.x, y2: target.y, t: 0, max: 0.3, color: t.def.color });
       boom(bt, target.x, target.y, 50, t.def.color, 0.45, t);
@@ -192,7 +192,7 @@ export function autoUlts(bt: Battle): void {
     const worth = k === 'gold' ? true
       : k === 'lives' ? bt.lives <= MAX_LIVES - 3
       // Executes wait for the epic monster or boss on the waves that have one.
-      : k === 'execute' ? big || (alive.length > 0 && bt.wave % 10 !== 0 && bt.wave !== bt.map.waves && !(bt.endless && bt.endlessWave() % 10 === 0))
+      : k === 'execute' ? big || (alive.length > 0 && bt.wave % 10 !== 0 && bt.wave !== bt.map.waves && !(bt.endless && bt.endlessWave() % 25 === 0))
       : k === 'buff' ? inRange(bt, t).length >= 2 || (big && inRange(bt, t).length > 0)
       : big || alive.length >= 5;
     if (worth) castUlt(bt, t);

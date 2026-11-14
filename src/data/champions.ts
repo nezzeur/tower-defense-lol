@@ -361,6 +361,21 @@ export const CHAMPIONS: ChampionDef[] = [
     },
   },
   {
+    // Endless-mode exclusive: very strong area damage and control, built to carry a team rather than replace it
+    id: 'lillia', name: 'Lillia', title: 'La Fleur timide', role: 'Mage', region: 'Ionia',
+    color: '#b48be0', rarity: 3, endless: true,
+    passive: 'Bâton chargé de rêves : frappe tout autour d\'elle, embrase les rêves (brûlure) et ronge 1,5 % des PV max tous les 3 coups.',
+    base: base({ dmg: 15, rate: 1.3, range: 2.7, type: 'aura', burn: { mult: 0.6, dur: 3 }, pctHp: { every: 3, pct: 0.015 } }),
+    ult: {
+      name: 'Coups fleuris', desc: 'Zone plus large, brûlure plus forte, attaque plus vite.',
+      apply: (s, r) => { s.range += 0.25 * r; s.burn!.mult += 0.15 * r; s.rate *= 1 + 0.08 * r; },
+    },
+    active: {
+      name: 'Berceuse', desc: 'Endort tous les ennemis 2,5 s, puis les ralentit de 50 %.', cd: 60,
+      fx: { kind: 'control', stun: 2.5, slow: 0.5, slowDur: 5, mult: 4 },
+    },
+  },
+  {
     id: 'jayce', name: 'Jayce', title: 'Le Défenseur de demain', role: 'Tireur', region: 'Piltover',
     color: '#3fa3e0', rarity: 3,
     passive: 'Canon Mercure : tous les 4 tirs, dégâts doublés.',

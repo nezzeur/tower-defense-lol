@@ -59,6 +59,17 @@ export const ITEMS: ItemDef[] = [
   { id: 'f-nexus', origin: 'all', category: 'Dégâts', name: 'Cœur du Nexus', icon: '💠', desc: "+70 % dégâts, +30 % vitesse d'attaque, +0,5 portée", price: 0,
     craft: { nexus: 3, ecaille: 5, buff: 15, plume: 15, glacevraie: 15, runenoire: 15, esprit: 15 },
     apply: (s) => { s.dmg *= 1.7; s.rate *= 1.3; s.range += 0.5; } },
+  // --- Relic items: forged from the relics of endless-mode bosses. New effects rather than bigger numbers. ---
+  { id: 'x-baron', origin: 'rift', category: 'Utilitaire', name: 'Regard du Baron', icon: '👁️', desc: '+1 cible (sinon +20 % dégâts) et +15 % dégâts', price: 0,
+    craft: { r_rift: 2, r_noxus: 1, buff: 20 }, apply: (s) => { extraTarget(s, 1.2); s.dmg *= 1.15; } },
+  { id: 'x-aegis', origin: 'demacia', category: 'Utilitaire', name: 'Égide de pétricite', icon: '🛡️', desc: 'Insensible au gel des boss, +20 % dégâts', price: 0,
+    craft: { r_demacia: 2, r_freljord: 1, plume: 20 }, apply: (s) => { s.unfreezable = true; s.dmg *= 1.2; } },
+  { id: 'x-winter', origin: 'freljord', category: 'Vitesse', name: 'Souffle de l\'hiver', icon: '❄️', desc: 'Chaque élimination retire 1,5 s à la recharge de l\'ultime, +15 % vitesse d\'attaque', price: 0,
+    craft: { r_freljord: 2, r_ionia: 1, glacevraie: 20 }, apply: (s) => { s.ultOnKill = (s.ultOnKill ?? 0) + 1.5; s.rate *= 1.15; } },
+  { id: 'x-fang', origin: 'noxus', category: 'Dégâts', name: 'Croc du bourreau', icon: '🩸', desc: 'Achève les monstres sous 12 % de PV (pas les boss), +15 % dégâts', price: 0,
+    craft: { r_noxus: 2, r_rift: 1, runenoire: 20 }, apply: (s) => { s.execute = Math.max(s.execute ?? 0, 0.12); s.dmg *= 1.15; } },
+  { id: 'x-veil', origin: 'ionia', category: 'Utilitaire', name: 'Voile d\'esprit', icon: '💧', desc: 'Ignore les boucliers, pleins dégâts contre les volants, +15 % dégâts', price: 0,
+    craft: { r_ionia: 2, r_demacia: 1, esprit: 20 }, apply: (s) => { s.trueSight = true; s.dmg *= 1.15; } },
 ];
 
 /** One more target for single/multi/chain attacks; other attack types get a damage bonus instead. */

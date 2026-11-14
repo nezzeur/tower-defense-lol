@@ -1,7 +1,7 @@
 import { REGIONS } from '../art/worldArt';
 import { FORGE_ITEMS, ITEM_BY_ID } from '../data/items';
 import { DROP_CHANCE, MATERIALS, MAT_BY_ID, MAT_RARITY } from '../data/loot';
-import { canCraft, champ, fmt, pct } from '../game';
+import { canCraft, champ, ENDLESS_LOOT, fmt, pct } from '../game';
 import { store } from '../save';
 import type { MaterialDef } from '../types';
 import { esc, itemIcon, portrait } from './common';
@@ -9,9 +9,13 @@ import { esc, itemIcon, portrait } from './common';
 const have = (id: string): number => store.data.mats[id] ?? 0;
 const regionName = (id: string): string => REGIONS.find((r) => r.id === id)?.name ?? id;
 
+/** How a material drops, in words. */
+const odds = (m: MaterialDef): string =>
+  m.relic ? `${pct(ENDLESS_LOOT.relicChance)} par boss d'infini` : `${pct(DROP_CHANCE[m.rarity])} par tirage`;
+
 /** Small material badge: icon, optional amount, rarity colour, tooltip with source and drop chance. */
 export function matChip(m: MaterialDef, amount?: string, cls = ''): string {
-  const tip = `${m.name} — ${MAT_RARITY[m.rarity]}\n${m.region ? `Tous les monstres : ${regionName(m.region)}` : m.desc}\n${pct(DROP_CHANCE[m.rarity])} par tirage`;
+  const tip = `${m.name} — ${MAT_RARITY[m.rarity]}\n${m.region ? `Tous les monstres : ${regionName(m.region)}` : m.desc}\n${odds(m)}`;
   return `<span class="mat m${m.rarity} ${cls}" title="${esc(tip)}"><i>${m.icon}</i>${amount !== undefined ? `<b>${amount}</b>` : ''}</span>`;
 }
 
@@ -20,7 +24,7 @@ function matTile(m: MaterialDef): string {
   return `<div class="mat-tile m${m.rarity} ${n ? '' : 'none'}">
     <div class="mat-ico">${m.icon}</div>
     <div class="mat-body"><b>${esc(m.name)}</b>
-      <span class="small"><em class="rar m${m.rarity}">${MAT_RARITY[m.rarity]}</em> · ${pct(DROP_CHANCE[m.rarity])} par tirage</span>
+      <span class="small"><em class="rar m${m.rarity}">${MAT_RARITY[m.rarity]}</em> · ${odds(m)}</span>
       <span class="small muted">${esc(m.region ? `Tous les monstres de la région` : m.desc)}</span></div>
     <div class="mat-n">${fmt(n)}</div>
   </div>`;
@@ -28,7 +32,8 @@ function matTile(m: MaterialDef): string {
 
 export function inventoryScreen(): string {
   const groups: [string, MaterialDef[]][] = [
-    ['Partout — selon le monstre', MATERIALS.filter((m) => !m.region)],
+    ['Partout — selon le monstre', MATERIALS.filter((m) => !m.region && !m.relic)],
+    [`Reliques — boss du mode infini (toutes les ${ENDLESS_LOOT.bossEvery} vagues)`, MATERIALS.filter((m) => m.relic)],
     ...REGIONS.filter((r) => MATERIALS.some((m) => m.region === r.id))
       .sort((a, b) => MATERIALS.findIndex((m) => m.region === a.id) - MATERIALS.findIndex((m) => m.region === b.id))
       .map((r) => [r.name, MATERIALS.filter((m) => m.region === r.id)] as [string, MaterialDef[]]),
@@ -44,6 +49,7 @@ export function inventoryScreen(): string {
     <section class="card loot-rules">
       <h3>Butin des monstres</h3>
       <p class="muted small">Chaque monstre éliminé peut lâcher des matériaux. La chance est fixe et ne dépend que de la rareté du matériau.
+        Les reliques ne tombent que sur le boss du mode infini, sans aucune garantie.
         Les gros monstres font plusieurs tirages : sbire canon et carapateur 2, super sbire et krug 3, gromp 4, monstre épique 25, boss final 50.</p>
       <div class="odds">${[1, 2, 3, 4].map((r) => `<div class="odd m${r}"><span>${MAT_RARITY[r]}</span><b>${pct(DROP_CHANCE[r])}</b><i>par tirage</i></div>`).join('')}</div>
     </section>

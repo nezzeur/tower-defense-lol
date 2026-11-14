@@ -77,6 +77,10 @@ export function statLines(s: Stats): string[] {
   if (s.killGold) L.push(`Or sur élim. <b>+${pct(s.killGold)}</b>`);
   if (s.livesPerWave) L.push(`Vies/vague <b>+${s.livesPerWave}</b>`);
   if (s.ramp) L.push(`Montée en puissance <b>+${pct(s.ramp.max)}</b>`);
+  if (s.unfreezable) L.push('Insensible au <b>gel</b> des boss');
+  if (s.ultOnKill) L.push(`Ultime <b>−${s.ultOnKill} s</b> par élim.`);
+  if (s.execute) L.push(`Achève sous <b>${Math.round(s.execute * 100)} %</b> PV`);
+  if (s.trueSight) L.push('Ignore <b>boucliers</b> et vol');
   if (s.bossMult) L.push(`Contre boss <b>x${s.bossMult.toFixed(2)}</b>`);
   if (s.killStack) L.push(s.killStack.persistent ? `Cumul/élim. <b>+${s.killStack.amount.toFixed(2)}</b> (permanent)` : `Cumul/élim. <b>+${Math.round(s.killStack.amount * 100)} %</b> (partie)`);
   return L;

@@ -1,5 +1,5 @@
 /* Inventory + forge */
-.m1 { --rc: var(--r1); } .m2 { --rc: var(--r2); } .m3 { --rc: var(--r3); } .m4 { --rc: var(--r4); }
+.m1 { --rc: var(--r1); } .m2 { --rc: var(--r2); } .m3 { --rc: var(--r3); } .m4 { --rc: var(--r4); } .m5 { --rc: var(--r5); }
 .odd.m1, .odd.m2, .odd.m3, .odd.m4 { border-top-color: var(--rc); }
 .inventory, .forge { display: flex; flex-direction: column; gap: 18px; }
 .loot-rules .odds { grid-template-columns: repeat(4, 1fr); max-width: 640px; margin-bottom: 0; }
@@ -10,7 +10,7 @@
 .mat-ico { width: 40px; height: 40px; display: grid; place-items: center; font-size: 22px; background: var(--bg2); border: 1px solid var(--rc); box-shadow: var(--inset-line); }
 .mat-body { display: flex; flex-direction: column; min-width: 0; }
 .mat-body b { font: 700 13px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; }
-.rar.m1, .rar.m2, .rar.m3, .rar.m4 { font-style: normal; color: var(--rc); font-weight: 700; }
+.rar.m1, .rar.m2, .rar.m3, .rar.m4, .rar.m5 { font-style: normal; color: var(--rc); font-weight: 700; }
 .mat-n { font: 700 20px var(--font-body); color: var(--gold1); min-width: 44px; text-align: right; }
 .mat { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px 1px 2px; background: var(--bg2); border: 1px solid var(--rc); font-size: 12px; }
 .mat i { font-style: normal; width: 22px; height: 22px; display: grid; place-items: center; font-size: 14px; }

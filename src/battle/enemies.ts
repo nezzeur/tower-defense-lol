@@ -124,7 +124,7 @@ export function useAbility(bt: Battle, e: Enemy): void {
     case 'freeze': {
       const r = ab.radius * TILE;
       for (const t of bt.towers) {
-        if (Math.hypot(t.x - e.x, t.y - e.y) > r) continue;
+        if (Math.hypot(t.x - e.x, t.y - e.y) > r || t.stats.unfreezable) continue;
         t.stunT = Math.max(t.stunT, ab.dur);
         t.engaged = false;
         if (v) { bt.fx.push({ kind: 'pillar', x: t.x, y: t.y + 12, t: 0, max: 0.7, color: '#8fd3ff' }); v.shards(t.x, t.y - 10, 6, '#e8f7ff', 140, t.y + 14); }

@@ -1,11 +1,11 @@
 // Champions attacking: target choice, projectiles, hits, damage, kills and loot.
 import { heroLook, lightColor, SHOT_SPEED } from '../art/heroes';
 import { sfx } from '../audio';
-import { MAT_BY_ID, rollLoot } from '../data/loot';
-import { goldScale } from '../game';
-import { store } from '../save';
+import { MAT_BY_ID, relicOf, rollLoot } from '../data/loot';
+import { goldScale, ENDLESS_LOOT, endlessChampMap } from '../game';
+import { persist, store } from '../save';
 import { type Enemy, type Proj, TILE, type Tower, fmtShort } from './model';
-import { boom, laserFx, auraFx, hitFx, deathFx } from './effects';
+import { boom, laserFx, auraFx, hitFx, deathFx, showBanner } from './effects';
 import { spawn, grip } from './enemies';
 import type { Battle } from './battle';
 
@@ -150,7 +150,7 @@ export function hit(bt: Battle, t: Tower, e: Enemy, mult: number): void {
   if (bt.visual) sfx('hit');
   const s = t.stats;
   t.hits++;
-  if (e.shield > 0) {
+  if (e.shield > 0 && !s.trueSight) {
     // The shield swallows the whole hit
     e.shield--;
     e.hitFlash = 0.08;
@@ -163,7 +163,7 @@ export function hit(bt: Battle, t: Tower, e: Enemy, mult: number): void {
   }
   let dmg = (s.dmg + t.runStacks) * mult;
   // Flyers slip out of area attacks
-  if (e.def.fly && (s.type === 'splash' || s.type === 'aura')) dmg *= 0.5;
+  if (e.def.fly && !s.trueSight && (s.type === 'splash' || s.type === 'aura')) dmg *= 0.5;
   let crit = false;
   if (s.everyN && t.hits % s.everyN.n === 0) { dmg *= s.everyN.mult; crit = true; }
   if (s.crit && Math.random() < s.crit.chance) { dmg *= s.crit.mult; crit = true; }
@@ -173,7 +173,7 @@ export function hit(bt: Battle, t: Tower, e: Enemy, mult: number): void {
   if (crit) bt.fx.push({ kind: 'text', x: e.x, y: e.y - 18, t: 0, max: 0.8, color: '#ffd84a', text: fmtShort(dmg), size: 21 });
   if (bt.vfx) hitFx(bt, t, e, crit, dmg);
   damage(bt, e, dmg, t, false);
-  if (s.pctHp && t.hits % s.pctHp.every === 0) damage(bt, e, e.maxHp * s.pctHp.pct, t, true);
+  if (s.pctHp && t.hits % s.pctHp.every === 0) damage(bt, e, e.maxHp * s.pctHp.pct * bt.pctHpScale(), t, true);
   if (e.dead) return;
   e.hitFlash = 0.08;
   const hold = grip(e);
@@ -197,6 +197,8 @@ export function damage(bt: Battle, e: Enemy, amount: number, src: Tower | null, 
   if (src) src.dmgDone += Math.min(dealt, Math.max(0, e.hp));
   if (dealt > bt.bestHit) bt.bestHit = dealt;
   e.hp -= dealt;
+  // Executioner items finish off weakened monsters (never bosses)
+  if (e.hp > 0 && src?.stats.execute && !e.def.boss && e.hp < e.maxHp * src.stats.execute) e.hp = 0;
   if (e.hp <= 0) kill(bt, e, src);
 }
 
@@ -214,6 +216,8 @@ export function kill(bt: Battle, e: Enemy, src: Tower | null): void {
     bt.fx.push({ kind: 'text', x: e.x, y: e.y - 24, t: 0, max: 1.2, color: '#f5c542', text: `+${fmtShort(gold)}` });
   }
   dropLoot(bt, e);
+  if (bt.endless && e.def.boss) endlessBossLoot(bt, e);
+  if (src?.stats.ultOnKill) src.ultCd = Math.max(0, src.ultCd - src.stats.ultOnKill);
   if (e.def.split && !bt.over) {
     for (let i = 0; i < e.def.split.n; i++) spawn(bt, e.def.split.id, { s: Math.max(0, e.s - i * 12), lane: e.lane });
   }
@@ -232,6 +236,34 @@ export function kill(bt: Battle, e: Enemy, src: Tower | null): void {
 }
 
 /** Loot roll for one kill: fixed chance per material rarity, straight into the inventory. */
+/**
+ * Endless-mode boss down: pure luck, nothing is ever guaranteed. It may drop the region's relic and,
+ * on the last map, the exclusive champion.
+ */
+export function endlessBossLoot(bt: Battle, e: Enemy): void {
+  const d = store.data;
+  const relic = relicOf(bt.map.region ?? '');
+  if (relic && Math.random() < ENDLESS_LOOT.relicChance) {
+    d.mats[relic.id] = (d.mats[relic.id] ?? 0) + 1;
+    bt.runLoot[relic.id] = (bt.runLoot[relic.id] ?? 0) + 1;
+    if (bt.visual) {
+      bt.fx.push({ kind: 'text', x: e.x, y: e.y - 70, t: 0, max: 2.2, color: '#ff6ad5', text: `${relic.icon} ${relic.name} !`, size: 20 });
+      bt.fx.push({ kind: 'pillar', x: e.x, y: e.y + 14, t: 0, max: 1.4, color: '#ff6ad5' });
+      showBanner(bt, `${relic.icon} Relique obtenue`, relic.name, '#ff6ad5');
+      sfx('chestBurst');
+    }
+  }
+  if (bt.map === endlessChampMap() && !d.owned.includes(ENDLESS_LOOT.champ) && Math.random() < ENDLESS_LOOT.champChance) {
+    d.owned.push(ENDLESS_LOOT.champ);
+    bt.newChampion = ENDLESS_LOOT.champ;
+    if (bt.visual) {
+      bt.fx.push({ kind: 'pillar', x: e.x, y: e.y + 14, t: 0, max: 2, color: '#b48be0' });
+      sfx('victory');
+    }
+  }
+  persist();
+}
+
 export function dropLoot(bt: Battle, e: Enemy): void {
   const loot = rollLoot(e.def, bt.map.region ?? '');
   let row = 0;

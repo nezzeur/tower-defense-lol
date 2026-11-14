@@ -15,6 +15,8 @@ export interface BoonDef {
 
 /** Chance that a blessing is offered after each endless wave. */
 export const BOON_CHANCE = 0.25;
+/** Blessings a run can hold in all: without a limit they outgrow the mode's difficulty curve. */
+export const BOON_MAX = 10;
 /** Seconds before auto waves pick one for an absent player. */
 export const BOON_AUTO_DELAY = 8;
 

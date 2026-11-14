@@ -8,7 +8,7 @@
   /* text + greys */
   --text: #f0e6d2; --muted: #a09b8c; --grey1: #3c3c41; --grey2: #5b5a56;
   /* rarity + status */
-  --r1: #a09b8c; --r2: #4a8fd8; --r3: #c084fc; --r4: #ffb347; --red: #e84057; --green: #6be08a; --star: #ffd84a;
+  --r1: #a09b8c; --r2: #4a8fd8; --r3: #c084fc; --r4: #ffb347; --r5: #ff6ad5; --red: #e84057; --green: #6be08a; --star: #ffd84a;
   /* fonts */
   --font-head: Cinzel, 'Marcellus', Georgia, serif;
   --font-body: 'Source Sans 3', system-ui, sans-serif;

@@ -31,6 +31,15 @@ export interface Stats {
   /** Attack speed ramp while attacking: +perHit per hit, up to max. */
   ramp?: { perHit: number; max: number };
   bossMult?: number;
+  // --- Effects of relic-forged items ---
+  /** Bosses cannot freeze this champion. */
+  unfreezable?: boolean;
+  /** Seconds taken off its ultimate's cooldown on each kill. */
+  ultOnKill?: number;
+  /** Finishes off non-boss monsters below this fraction of their HP. */
+  execute?: number;
+  /** Its hits ignore shields and are not reduced against flyers. */
+  trueSight?: boolean;
 }
 
 /** How a placed champion picks among the enemies in range. */
@@ -71,6 +80,8 @@ export interface ChampionDef {
   starter?: boolean;
   /** Map id whose completion grants this champion (not in chests). */
   reward?: string;
+  /** Only drops from the endless-mode boss of the last map (not in chests). */
+  endless?: boolean;
   passive: string;
   base: Stats;
   /** Passive upgrade unlocked at levels 6 / 11 / 16 ("ult rank"). */
@@ -213,11 +224,13 @@ export interface MaterialDef {
   id: string;
   name: string;
   icon: string;
-  /** 1 commun, 2 rare, 3 épique, 4 légendaire. */
-  rarity: 1 | 2 | 3 | 4;
+  /** 1 commun, 2 rare, 3 épique, 4 légendaire, 5 mythique (relics). */
+  rarity: 1 | 2 | 3 | 4 | 5;
   /** Region id whose maps drop it (any monster there). */
   region?: string;
   /** Enemy ids that drop it on any map; 'boss' = every final boss, 'any' = every monster. */
   from?: string[];
+  /** Relic: only the endless-mode boss of this region drops it. */
+  relic?: string;
   desc: string;
 }

@@ -71,7 +71,7 @@ const TIPS: Tip[] = [
     text: 'Deux champions de la même région posés ensemble donnent un bonus à toute l\'équipe. Il grandit à 3 puis 4 champions.',
     when: () => fight() && Object.keys(b()!.syn).length > 0 },
   { id: 'b-modes', title: 'Modes de jeu', target: '#b-modes',
-    text: 'Carte terminée : choisis Normal, Boss (la dernière vague seule) ou Infini (sans fin, de plus en plus dur, avec des bénédictions à choisir). Rien ne démarre avant que tu lances la vague.',
+    text: 'Carte terminée : choisis Normal, Boss (la dernière vague seule) ou Infini (sans fin, de plus en plus dur, avec des bénédictions à choisir, et un boss toutes les 25 vagues qui peut lâcher une relique). Rien ne démarre avant que tu lances la vague.',
     when: () => fight() && !!document.querySelector('#b-modes:not(.hidden)') },
 ];
 
@@ -158,9 +158,9 @@ export function tutorialTick(): void {
   if (typeof document === 'undefined' || !store.data.owned.length) { hide(); return; }
   const done = seen();
   if (shown) {
-    if (done.includes(shown.id)) hide();
+    // `when` first: it also guards `done`, which may read a battle that no longer exists
+    if (done.includes(shown.id) || !shown.when()) hide();
     else if (shown.done?.()) { mark(shown.id); hide(); }
-    else if (!shown.when()) hide();
   }
   if (!shown) {
     const next = TIPS.find((t) => !done.includes(t.id) && t.when() && !t.done?.());

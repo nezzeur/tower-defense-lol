@@ -8,7 +8,7 @@ const KEYS: Record<string, string> = {
   gangplank: 'Gangplank', soraka: 'Soraka', vayne: 'Vayne', ziggs: 'Ziggs', kogmaw: 'KogMaw', yasuo: 'Yasuo',
   heimer: 'Heimerdinger', brand: 'Brand', morgana: 'Morgana', zed: 'Zed', missfortune: 'MissFortune', nasus: 'Nasus',
   veigar: 'Veigar', anivia: 'Anivia', malzahar: 'Malzahar',
-  garen: 'Garen', darius: 'Darius', ahri: 'Ahri', jayce: 'Jayce',
+  garen: 'Garen', darius: 'Darius', ahri: 'Ahri', jayce: 'Jayce', lillia: 'Lillia',
 };
 
 export async function initArt(): Promise<void> {

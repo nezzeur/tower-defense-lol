@@ -2,7 +2,7 @@ import { loadingUrl, splashUrl } from '../art/champArt';
 import { CHAMPIONS } from '../data/champions';
 import { ITEMS, ITEM_BY_ID } from '../data/items';
 import { MAPS, MAP_BY_ID } from '../data/maps';
-import { champ, computeStats, fmt, level, MAX_LEVEL, ULT_LEVELS, ultRank } from '../game';
+import { champ, computeStats, fmt, level, MAX_LEVEL, ULT_LEVELS, ultRank, ENDLESS_LOOT, endlessChampMap, pct } from '../game';
 import { SYNERGIES, SYN_TIERS, synText } from '../data/synergies';
 import { store } from '../save';
 import type { ChampionDef } from '../types';
@@ -26,7 +26,7 @@ export function champsScreen(): string {
   const totalLv = owned.reduce((n, id) => n + level(id), 0);
   const grid = list.map((c, i) => {
     const has = owned.includes(c.id);
-    const src = c.reward ? `Butin du boss : ${MAP_BY_ID[c.reward].name}` : c.starter ? 'Champion de départ' : 'Coffre Hextech';
+    const src = c.endless ? `Mode infini : boss de « ${endlessChampMap().name} » (${pct(ENDLESS_LOOT.champChance)})` : c.reward ? `Butin du boss : ${MAP_BY_ID[c.reward].name}` : c.starter ? 'Champion de départ' : 'Coffre Hextech';
     const lvl = level(c.id), rank = ultRank(lvl);
     return `<button class="coll-card r${c.rarity} ${has ? '' : 'locked'} ${c.id === ui.selectedChamp ? 'sel' : ''}"
       ${has ? `data-champ="${c.id}"` : 'disabled'} style="--d:${Math.min(i, 12) * 30}ms">

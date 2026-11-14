@@ -30,7 +30,7 @@ export const BALANCE = {
    * The level factor makes enemies tougher for an over-levelled team (levelShare of each level's damage gain is
    * matched), so the mode stays tense, yet wave 200+ remains reachable with highly levelled champions and blessings.
    */
-  endless: { start: 1.25, linear: 0.06, growth: 1.006, levelShare: 0.7, refLevel: 17, refLevelPerMap: 1.1 },
+  endless: { start: 1.25, linear: 0.06, growth: 1.006, levelShare: 0.65, refLevel: 18, refLevelPerMap: 2.05 },
   chestBase: 120,
   chestGrowth: 1.45,
 };
@@ -92,15 +92,30 @@ export const endlessRefLevel = (m: MapDef): number => BALANCE.endless.refLevel +
 export const endlessLevelFactor = (m: MapDef, teamLevel: number): number =>
   BALANCE.dmgPerLevel ** (BALANCE.endless.levelShare * Math.max(0, teamLevel - endlessRefLevel(m)));
 
+/** Wave whose enemy strength endless mode starts from (the last wave of a regular map). */
+const ENDLESS_BASE_WAVE = 30;
+
+/** How much endless wave n multiplies enemy HP compared with the map's last wave (level factor aside). */
+export const endlessWaveFactor = (n: number): number => BALANCE.endless.start * (1 + BALANCE.endless.linear * n) * BALANCE.endless.growth ** n;
+
 /** Enemy HP multiplier on endless wave n (1, 2, 3...) for a team of this average level. */
 export function endlessHp(m: MapDef, n: number, teamLevel: number): number {
-  const e = BALANCE.endless;
-  return hpScale(m, m.waves) * e.start * (1 + e.linear * n) * e.growth ** n * endlessLevelFactor(m, teamLevel);
+  // Arenas (40 waves) restart from the strength of a regular map's last wave, or their endless mode would be out of reach
+  return hpScale(m, Math.min(m.waves, ENDLESS_BASE_WAVE)) * endlessWaveFactor(n) * endlessLevelFactor(m, teamLevel);
 }
 export const goldScale = (m: MapDef, w: number): number => (1 + BALANCE.goldPerWave * w) * m.mult ** BALANCE.goldMultExp;
 export const waveBonus = (m: MapDef, w: number): number => Math.round((10 + 3 * w) * m.mult ** BALANCE.goldMultExp);
 
 export interface Spawn { id: string; delay: number }
+
+/**
+ * Endless-mode rewards, all pure luck: the map's boss returns every `bossEvery` endless waves; killing it may drop
+ * the region's relic (forge material) and, on the last map only, the exclusive champion.
+ */
+export const ENDLESS_LOOT = { bossEvery: 25, relicChance: 0.12, champ: 'lillia', champChance: 0.01 };
+
+/** The endless-exclusive champion can only drop on the campaign's last map. */
+export const endlessChampMap = (): MapDef => MAPS[MAPS.length - 1];
 
 /** Who fills each slot of a wave. Regions swap in their own troops (data/enemies.ts). */
 interface Roster {
@@ -127,9 +142,9 @@ export function buildWave(m: MapDef, w: number): Spawn[] {
   const out: Spawn[] = [];
   const ro = REGION_ROSTER[m.region ?? 'rift'] ?? RIFT_ROSTER;
   // The final boss closes the map, and comes back every 10 waves of endless mode with a bigger escort
-  if (w === m.waves || (w > m.waves && (w - m.waves) % 10 === 0)) {
+  if (w === m.waves || (w > m.waves && (w - m.waves) % ENDLESS_LOOT.bossEvery === 0)) {
     out.push({ id: m.finalBoss, delay: 0 });
-    const escort = 10 + Math.max(0, Math.floor((w - m.waves) / 10)) * 4;
+    const escort = 10 + Math.max(0, Math.floor((w - m.waves) / ENDLESS_LOOT.bossEvery)) * 6;
     for (let i = 0; i < escort; i++) out.push({ id: ro.elite, delay: 0.8 });
     return out;
   }
@@ -155,7 +170,7 @@ export function buildWave(m: MapDef, w: number): Spawn[] {
 export const chestPrice = (): number => Math.round(BALANCE.chestBase * BALANCE.chestGrowth ** Math.max(0, store.data.owned.length - 1));
 
 export function chestPool(): ChampionDef[] {
-  return CHAMPIONS.filter((c) => !c.reward && !store.data.owned.includes(c.id));
+  return CHAMPIONS.filter((c) => !c.reward && !c.endless && !store.data.owned.includes(c.id));
 }
 
 export const CHEST_CHOICES = 3;

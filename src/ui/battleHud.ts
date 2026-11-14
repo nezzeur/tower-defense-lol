@@ -4,19 +4,19 @@ import { FEATURE_INFO } from '../art/mapArt';
 import { Battle, initials, PRIORITIES, SPELLS, TEAM_SLOTS, type Enemy, type SpellId, type Tower } from '../battle';
 import { SYN_TIERS, synText, teamSynergies } from '../data/synergies';
 import type { Priority } from '../types';
-import { BOON_BY_ID, BOON_CHANCE, BOONS } from '../data/boons';
+import { BOON_BY_ID, BOON_CHANCE, BOON_MAX } from '../data/boons';
 import { ENEMIES, enemyTraits } from '../data/enemies';
-import { lootRolls, lootTable, MAT_BY_ID, MATERIALS } from '../data/loot';
+import { lootRolls, lootTable, MAT_BY_ID, MATERIALS, relicOf } from '../data/loot';
 import { matChip } from './inventory';
 import { MAP_BY_ID } from '../data/maps';
 import { REGIONS } from '../art/worldArt';
-import { champ, endlessLevelFactor, endlessRefLevel, endlessUnlocked, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots } from '../game';
+import { champ, ENDLESS_LOOT, endlessChampMap, endlessLevelFactor, endlessRefLevel, endlessUnlocked, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots } from '../game';
 import { sfx } from '../audio';
 import { setMusic, setMusicIntensity } from '../music';
 import { tutorialTick } from './tutorial';
 import { persist, store } from '../save';
 import type { MapDef } from '../types';
-import { app, esc, itemSelect, abilityRow, levelButtons, mapThumb, portrait, starRow, statLines, ui, ultButton } from './common';
+import { app, esc, itemSelect, abilityRow, levelButtons, mapThumb, portrait, starRow, statLines, ui, ultButton, flash } from './common';
 import { go } from './index';
 
 export function startBattle(mapId: string): void {
@@ -58,7 +58,7 @@ export function startBattle(mapId: string): void {
           <span class="small muted">Mode</span>
           <button class="chip" data-mode="normal" title="Les ${map.waves} vagues de la carte">Normal</button>
           <button class="chip" data-mode="boss" title="Commence directement à la vague ${map.waves}">Boss ⚔</button>
-          <button class="chip" data-mode="endless" title="Après la vague ${map.waves} : les vagues continuent sans fin, de plus en plus dures, avec le boss toutes les 10 vagues. Les ennemis sont plus résistants si ton équipe dépasse le niveau de la carte. Après chaque vague, une bénédiction peut apparaître.">Infini ∞</button>
+          <button class="chip" data-mode="endless" title="Après la vague ${map.waves} : les vagues continuent sans fin, de plus en plus dures, avec le boss toutes les 25 vagues (reliques de forge, à la chance). Les ennemis sont plus résistants si ton équipe dépasse le niveau de la carte. Après chaque vague, une bénédiction peut apparaître.">Infini ∞</button>
         </div>
         <button class="btn start" id="b-start" data-startwave>Lancer la vague ▶</button>
       </div>
@@ -176,7 +176,8 @@ function mapInfoPanel(b: Battle): string {
       <div class="mi-thumb">${mapThumb(m.id)}</div>
       <div class="mi-row"><b>${esc(m.name)}</b>${starRow(stars(m.id))}</div>
       <div class="small muted">${esc(m.subtitle)} · record vague ${best}/${m.waves}</div>
-      ${endlessUnlocked(m.id) ? `<div class="small">∞ Mode infini · record <b>${store.data.endless[m.id] ?? 0}</b> vague(s)</div>` : `<div class="small muted">∞ Mode infini : termine la carte pour l'ouvrir</div>`}
+      ${endlessUnlocked(m.id) ? `<div class="small">∞ Mode infini · record <b>${store.data.endless[m.id] ?? 0}</b> vague(s)</div>
+        <div class="small muted">Boss toutes les ${ENDLESS_LOOT.bossEvery} vagues : ${relicOf(m.region ?? '') ? `${pct(ENDLESS_LOOT.relicChance)} ${relicOf(m.region ?? '')!.icon} ${esc(relicOf(m.region ?? '')!.name)}` : ''}${m === endlessChampMap() && !store.data.owned.includes(ENDLESS_LOOT.champ) ? ` · ${pct(ENDLESS_LOOT.champChance)} champion mystère` : ''}</div>` : `<div class="small muted">∞ Mode infini : termine la carte pour l'ouvrir</div>`}
     </div>
     <div class="hud-card">
       <div class="hud-title">Boss final</div>
@@ -211,7 +212,7 @@ function wavePanel(b: Battle): string {
   const m = b.map;
   const remaining = b.waveRemaining();
   const ew = b.endlessWave();
-  const nextBoss = b.endless ? m.waves + (Math.floor(ew / 10) + 1) * 10 : b.wave >= m.waves ? 0 : (Math.floor(b.wave / 10) + 1) * 10;
+  const nextBoss = b.endless ? m.waves + (Math.floor(ew / ENDLESS_LOOT.bossEvery) + 1) * ENDLESS_LOOT.bossEvery : b.wave >= m.waves ? 0 : (Math.floor(b.wave / 10) + 1) * 10;
   const bossIn = nextBoss - b.wave;
   const next = b.nextWave();
   const total = Math.max(1, b.towers.reduce((n, t) => n + t.dmgDone, 0));
@@ -222,7 +223,7 @@ function wavePanel(b: Battle): string {
       <div class="hud-title">Vague</div>
       ${b.endless
         ? `<div class="wave-big"><b>∞ ${ew}</b><span>record ${store.data.endless[m.id] ?? 0}</span></div>
-           <div class="bar"><div style="width:${((ew % 10) / 10) * 100}%"></div></div>
+           <div class="bar"><div style="width:${((ew % ENDLESS_LOOT.bossEvery) / ENDLESS_LOOT.bossEvery) * 100}%"></div></div>
            <div class="small" title="Les ennemis de l'infini gagnent des PV quand ton équipe dépasse le niveau attendu sur cette carte (niveau ${Math.round(endlessRefLevel(m))}).">Équipe niv. <b>${Math.round(b.teamLevel())}</b> · ennemis <b>×${endlessLevelFactor(m, b.teamLevel()).toFixed(1)}</b> PV</div>`
         : `<div class="wave-big"><b>${b.wave}</b><span>/ ${m.waves}</span></div>
            <div class="bar"><div style="width:${(b.wave / m.waves) * 100}%"></div></div>`}
@@ -235,10 +236,10 @@ function wavePanel(b: Battle): string {
       <div class="next-wave">${next.length ? next.map((x) => `<div class="nw">${creatureIcon(x.id)}<span>x${x.n}</span><i class="nw-traits">${enemyTraits(ENEMIES[x.id]).map((t) => t.icon).join('')}</i></div>`).join('') : '<span class="small muted">—</span>'}</div>
     </div>
     ${b.endless ? `<div class="hud-card">
-      <div class="hud-title">Bénédictions</div>
+      <div class="hud-title">Bénédictions ${b.boonCount()}/${BOON_MAX}</div>
       ${Object.keys(b.boons).length
         ? `<div class="boon-list">${Object.entries(b.boons).map(([id, n]) => `<span class="tagc" title="${esc(BOON_BY_ID[id].desc)}">${BOON_BY_ID[id].icon} ${esc(BOON_BY_ID[id].name)}${n > 1 ? ` ×${n}` : ''}</span>`).join('')}</div>`
-        : `<span class="small muted">${BOONS.length} bénédictions existent. Après chaque vague, ${Math.round(BOON_CHANCE * 100)} % de chance d'en recevoir une à choisir parmi 3.</span>`}
+        : `<span class="small muted">Après chaque vague, ${Math.round(BOON_CHANCE * 100)} % de chance d'en recevoir une à choisir parmi 3. ${BOON_MAX} au maximum par partie.</span>`}
     </div>` : ''}
     <div class="hud-card">
       <div class="hud-title">Synergies</div>
@@ -323,6 +324,13 @@ export function refreshLive(): void {
   });
   const b = ui.battle;
   if (!b) return;
+  if (b.newChampion) {
+    // An endless boss dropped the exclusive champion
+    const got = champ(b.newChampion);
+    b.newChampion = null;
+    flash(`${portrait(got, 44)}<div>Le boss lâche un champion !<br><b>${esc(got.name)}</b> — ${esc(got.title)}</div>`);
+    renderSide();
+  }
   const wp = document.getElementById('wave-panel');
   // Only touch the DOM when something changed, so hover tooltips and images don't flicker.
   const setHtml = (el: HTMLElement, html: string) => { if (liveHtml.get(el) !== html) { liveHtml.set(el, html); el.innerHTML = html; } };

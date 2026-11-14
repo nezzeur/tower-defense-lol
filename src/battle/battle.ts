@@ -7,10 +7,10 @@ import { Vfx } from '../art/vfx';
 import type { MapLight } from '../art/regionArt';
 import { sfx } from '../audio';
 import { ENEMIES } from '../data/enemies';
-import { BOON_AUTO_DELAY, BOON_BY_ID, BOON_CHANCE, rollBoons, type BoonDef } from '../data/boons';
+import { BOON_AUTO_DELAY, BOON_BY_ID, BOON_CHANCE, BOON_MAX, rollBoons, type BoonDef } from '../data/boons';
 import { teamSynergies, type SynStat } from '../data/synergies';
 import { COLS, ROWS } from '../data/maps';
-import { buildWave, champ, computeStats, endlessHp, endlessUnlocked, goldScale, hpScale, level, MAX_LIVES, START_LIVES, teamSlots, waveBonus, type Spawn } from '../game';
+import { buildWave, champ, computeStats, endlessHp, endlessUnlocked, goldScale, hpScale, level, MAX_LIVES, START_LIVES, teamSlots, waveBonus, type Spawn, ENDLESS_LOOT, endlessWaveFactor } from '../game';
 import { persist, store } from '../save';
 import type { ChampionDef, FeatureKind, MapDef, Priority, Stats } from '../types';
 import { type BattleEvents, type Enemy, type Fx, H, type Proj, SPELLS, STEP, type SpellId, TEAM_SLOTS, TILE, type Tower, W, fmtShort } from './model';
@@ -83,6 +83,8 @@ export class Battle {
   /** Blessings picked this run (id -> stacks) and the three currently on offer, if any. */
   boons: Record<string, number> = {};
   boonOffer: BoonDef[] | null = null;
+  /** Champion just dropped by an endless boss; the HUD announces it then clears this. */
+  newChampion: string | null = null;
   boonT = 0;
 
   // Visual-only state (skipped headless)
@@ -365,6 +367,19 @@ export class Battle {
     return this.endless && this.wave > this.map.waves ? endlessHp(this.map, this.endlessWave(), this.teamLevel()) : hpScale(this.map, this.wave);
   }
 
+  /**
+   * Scale of "% of max HP" damage. In endless mode it shrinks as the waves grow, otherwise such damage would
+   * ignore the mode's whole difficulty curve (it kills in a fixed number of hits whatever the HP).
+   */
+  pctHpScale(): number {
+    return this.endless && this.wave > this.map.waves ? 1 / endlessWaveFactor(this.endlessWave()) : 1;
+  }
+
+  /** Blessings taken this run. */
+  boonCount(): number {
+    return Object.values(this.boons).reduce((n, v) => n + v, 0);
+  }
+
   /** Waves survived in the current endless run. */
   endlessWave(): number {
     return Math.max(0, this.wave - this.map.waves);
@@ -385,7 +400,7 @@ export class Battle {
     this.waveActive = true;
     this.autoT = -1;
     if (this.visual) sfx('wave');
-    const final = this.wave === this.map.waves || (this.endless && this.endlessWave() % 10 === 0);
+    const final = this.wave === this.map.waves || (this.endless && this.endlessWave() % ENDLESS_LOOT.bossEvery === 0);
     showBanner(this, final ? 'BOSS' : this.endless ? `Infini · vague ${this.endlessWave()}` : `Vague ${this.wave}`, final ? ENEMIES[this.map.finalBoss].name
       : this.wave % 10 === 0 ? 'Monstre épique en approche' : this.wave % 5 === 0 ? 'Carapateurs !' : '', final ? '#c084fc' : '#f0e6d2');
     this.ev.onChange();
@@ -441,7 +456,7 @@ export class Battle {
     if (id === 'smite') {
       if (!alive.length) return;
       const target = alive.reduce((a, b) => (b.hp > a.hp ? b : a));
-      damage(this, target, target.maxHp * 0.2, null, true);
+      damage(this, target, target.maxHp * 0.2 * this.pctHpScale(), null, true);
       boom(this, target.x, target.y, 34, '#ffd84a', 0.4);
       this.vfx?.light(target.x, target.y - 40, 60, '#ffd84a', 0.7, 0.3);
     } else if (id === 'exhaust') {
@@ -568,7 +583,7 @@ export class Battle {
     this.lives = Math.min(MAX_LIVES, this.lives + heal);
     persist();
     // Endless mode only: after any wave, a blessing may appear; the run then waits for the player's choice
-    if (this.endless && this.endlessWave() > 0 && Math.random() < BOON_CHANCE) {
+    if (this.endless && this.endlessWave() > 0 && this.boonCount() < BOON_MAX && Math.random() < BOON_CHANCE) {
       this.boonOffer = rollBoons();
       this.boonT = BOON_AUTO_DELAY;
       if (!this.visual) this.pickBoon();
