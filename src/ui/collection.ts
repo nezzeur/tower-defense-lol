@@ -2,7 +2,7 @@ import { loadingUrl, splashUrl } from '../art/champArt';
 import { CHAMPIONS } from '../data/champions';
 import { ITEMS, ITEM_BY_ID } from '../data/items';
 import { MAPS, MAP_BY_ID } from '../data/maps';
-import { champ, computeStats, fmt, level, MAX_LEVEL, ULT_LEVELS, ultRank, ENDLESS_LOOT, endlessChampMap, pct } from '../game';
+import { champ, computeStats, fmt, level, MAX_LEVEL, ULT_LEVELS, ultRank, ENDLESS_LOOT, endlessChampMap, pct, permStackMult } from '../game';
 import { SYNERGIES, SYN_TIERS, synText } from '../data/synergies';
 import { store } from '../save';
 import type { ChampionDef } from '../types';
@@ -90,7 +90,7 @@ function champDetail(def: ChampionDef): string {
     ${abilityRow(def)}
     <div class="hud-title">Statistiques</div>
     <div class="stat-grid">${statLines(s).map((l) => `<div>${l}</div>`).join('')}</div>
-    ${stacks ? `<div class="run-line"><span>Cumuls permanents</span><b>+${stacks.toFixed(1)} dégâts</b></div>` : ''}
+    ${stacks ? `<div class="run-line"><span>Cumuls permanents</span><b>+${Math.round((permStackMult(stacks) - 1) * 100)} % dégâts</b></div>` : ''}
     <div class="hud-title">Équipement</div>
     <div class="equip-row">${item ? itemIcon(item, 44) : '<span class="item-slot empty">+</span>'}${itemSelect(def)}</div>
     <div class="hud-title">Déployé sur</div>

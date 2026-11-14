@@ -2,7 +2,7 @@
 import { heroLook, lightColor, SHOT_SPEED } from '../art/heroes';
 import { sfx } from '../audio';
 import { MAT_BY_ID, relicOf, rollLoot } from '../data/loot';
-import { goldScale, ENDLESS_LOOT, endlessChampMap } from '../game';
+import { goldScale, ENDLESS_LOOT, endlessChampMap, permStackMult } from '../game';
 import { persist, store } from '../save';
 import { type Enemy, type Proj, TILE, type Tower, fmtShort } from './model';
 import { boom, laserFx, auraFx, hitFx, deathFx, showBanner } from './effects';
@@ -226,8 +226,9 @@ export function kill(bt: Battle, e: Enemy, src: Tower | null): void {
   const ks = src.stats.killStack;
   if (ks) {
     if (ks.persistent) {
-      store.data.stacks[src.def.id] = (store.data.stacks[src.def.id] ?? 0) + ks.amount;
-      src.stats.dmg += ks.amount;
+      const before = store.data.stacks[src.def.id] ?? 0;
+      store.data.stacks[src.def.id] = before + ks.amount;
+      src.stats.dmg *= permStackMult(before + ks.amount) / permStackMult(before);
     } else {
       // Per-run stacks are a fraction of the champion's damage, so they keep their weight at high levels.
       src.runStacks += ks.amount * src.stats.dmg;

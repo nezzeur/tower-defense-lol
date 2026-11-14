@@ -39,6 +39,9 @@ export const level = (id: string): number => store.data.levels[id] ?? 1;
 export const ultRank = (lvl: number): number => ULT_LEVELS.filter((l) => lvl >= l).length;
 export const levelCost = (lvl: number): number => Math.round(BALANCE.levelCostBase * BALANCE.levelCostGrowth ** (lvl - 1));
 
+/** Damage multiplier from permanent kill stacks: +3 % x sqrt(stacks). 1000 kills (200 stacks) = +42 %. */
+export const permStackMult = (stacks: number): number => 1 + 0.03 * Math.sqrt(Math.max(0, stacks));
+
 export function computeStats(def: ChampionDef, lvl = level(def.id)): Stats {
   const s: Stats = JSON.parse(JSON.stringify(def.base));
   const rank = ultRank(lvl);
@@ -46,7 +49,8 @@ export function computeStats(def: ChampionDef, lvl = level(def.id)): Stats {
   if (rank > 0) def.ult.apply(s, rank);
   const item = store.data.equip[def.id];
   if (item && ITEM_BY_ID[item]) ITEM_BY_ID[item].apply(s);
-  s.dmg += store.data.stacks[def.id] ?? 0;
+  // Permanent kill stacks (Nasus) multiply damage, with diminishing returns: a flat bonus meant nothing at high levels
+  s.dmg *= permStackMult(store.data.stacks[def.id] ?? 0);
   return s;
 }
 

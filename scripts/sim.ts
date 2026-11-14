@@ -6,7 +6,7 @@ import { CHAMPIONS } from '../src/data/champions';
 import { SHOP_ITEMS as ITEMS } from '../src/data/items';
 import { applyCurve, COLS, MAP_CURVE, MAPS, ROWS } from '../src/data/maps';
 import {
-  BALANCE, chestPool, claimChest, chestPrice, computeStats, isUnlocked, level, levelCost, MAX_LEVEL, openChest, rollReward, stars, teamSlots,
+  BALANCE, chestPool, hpScale, claimChest, chestPrice, computeStats, isUnlocked, level, levelCost, MAX_LEVEL, openChest, rollReward, stars, teamSlots,
   tryLevelUp,
 } from '../src/game';
 import { store } from '../src/save';
@@ -119,6 +119,7 @@ function useSpells(b: Battle): void {
 
 /** Average level of the placed team when each map was first cleared (ENDLESS=1 prints it to calibrate endless mode). */
 const clearLevel: Record<string, number> = {};
+const hitsToKill: Record<string, number> = {};
 
 function play(m: MapDef, boss = false): { wave: number; win: boolean } {
   let result = { wave: 0, win: false };
@@ -140,7 +141,11 @@ function play(m: MapDef, boss = false): { wave: number; win: boolean } {
       b.startWave();
     }
   }
-  if (result.win && clearLevel[m.id] === undefined) clearLevel[m.id] = b.teamLevel();
+  if (result.win && clearLevel[m.id] === undefined) {
+    clearLevel[m.id] = b.teamLevel();
+    // Raw hits the strongest champion needs to kill a wave-25 minion: flat across maps = levels keep up with enemy HP
+    hitsToKill[m.id] = (12 * hpScale(m, 25)) / Math.max(...b.towers.map((t) => t.stats.dmg));
+  }
   return result;
 }
 
@@ -198,6 +203,7 @@ function playEndless(m: MapDef): { waves: number; team: string } {
 if (process.env.ENDLESS) {
   // ENDLESS_LVL=<n>: probe with every champion at that level instead of the bot's own levels
   if (process.env.ENDLESS_LVL) for (const id of store.data.owned) store.data.levels[id] = Number(process.env.ENDLESS_LVL);
+  console.log('raw hits to kill a wave-25 minion at first clear: ' + MAPS.map((m) => Math.round(hitsToKill[m.id] ?? 0)).join(' '));
   console.log('team level at first clear, by map index: ' + MAPS.map((m) => Math.round(clearLevel[m.id] ?? 0)).join(' '));
   for (const i of [0, 4, 10, 17, 25, MAPS.length - 1]) {
     const m = MAPS[i];

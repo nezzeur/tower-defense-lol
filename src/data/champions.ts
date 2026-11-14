@@ -9,8 +9,8 @@ export const CHAMPIONS: ChampionDef[] = [
   {
     id: 'ashe', name: 'Ashe', title: "L'Archère de givre", role: 'Tireur', region: 'Freljord',
     color: '#7fc8f8', rarity: 1, starter: true,
-    passive: 'Tir givré : chaque attaque ralentit de 20 %.',
-    base: base({ dmg: 10, rate: 1.1, range: 3.2, slow: { pct: 0.2, dur: 1 } }),
+    passive: 'Salve givrée : tire sur 3 cibles et les ralentit de 20 %.',
+    base: base({ dmg: 10, rate: 1.1, range: 3.2, type: 'multi', targets: 3, slow: { pct: 0.2, dur: 1 } }),
     ult: {
       name: 'Flèche de cristal enchantée', desc: 'Ralentissement renforcé et chance d\'étourdir.',
       apply: (s, r) => { s.slow!.pct += 0.1 * r; s.stun = { chance: 0.08 * r, dur: 1.2 }; },
@@ -54,7 +54,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'caitlyn', name: 'Caitlyn', title: 'Le Shérif de Piltover', role: 'Tireur', region: 'Piltover',
     color: '#b28dff', rarity: 2,
     passive: 'Tir dans la tête : tous les 6 tirs, dégâts x2,5.',
-    base: base({ dmg: 30, rate: 0.5, range: 5.5, everyN: { n: 6, mult: 2.5 } }),
+    base: base({ dmg: 46, rate: 0.6, range: 5.5, everyN: { n: 6, mult: 2.5 } }),
     ult: {
       name: 'Tir de précision', desc: 'Tirs dans la tête plus fréquents et plus forts.',
       apply: (s, r) => { s.everyN!.n = Math.max(3, 6 - r); s.everyN!.mult += 0.5 * r; },
@@ -95,8 +95,8 @@ export const CHAMPIONS: ChampionDef[] = [
   {
     id: 'tf', name: 'Twisted Fate', title: 'Le Maître des cartes', role: 'Mage', region: 'Bilgewater',
     color: '#e8b04a', rarity: 2,
-    passive: 'Dés pipés : 25 % de chance de gagner de l\'or à chaque coup.',
-    base: base({ dmg: 9, rate: 1, range: 3.2, goldHit: { chance: 0.25, amount: 1 } }),
+    passive: 'Dés pipés : lance 3 cartes ; 25 % de chance de gagner de l\'or à chaque coup.',
+    base: base({ dmg: 9, rate: 1, range: 3.2, type: 'multi', targets: 3, goldHit: { chance: 0.25, amount: 1 } }),
     ult: {
       name: 'Carte dorée', desc: 'Peut étourdir, plus d\'or par coup.',
       apply: (s, r) => { s.stun = { chance: 0.1 * r, dur: 1 }; s.goldHit!.chance += 0.1 * r; },
@@ -110,7 +110,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'gangplank', name: 'Gangplank', title: 'Le Fléau des mers', role: 'Combattant', region: 'Bilgewater',
     color: '#d9534f', rarity: 2,
     passive: 'Baril de poudre : zone, +30 % d\'or sur les éliminations.',
-    base: base({ dmg: 14, rate: 0.6, range: 3, type: 'splash', splash: 0.9, killGold: 0.3 }),
+    base: base({ dmg: 18, rate: 0.6, range: 3, type: 'splash', splash: 0.9, killGold: 0.3 }),
     ult: {
       name: 'Barrage de canon', desc: 'Plus d\'or et de dégâts.',
       apply: (s, r) => { s.killGold! += 0.25 * r; s.dmg *= 1 + 0.15 * r; },
@@ -138,7 +138,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'vayne', name: 'Vayne', title: 'La Chasseresse nocturne', role: 'Tireur', region: 'Demacia',
     color: '#9b6bd6', rarity: 3,
     passive: 'Coups d\'argent : tous les 3 coups, 4 % des PV max en dégâts bruts.',
-    base: base({ dmg: 11, rate: 1.3, range: 3, pctHp: { every: 3, pct: 0.04 } }),
+    base: base({ dmg: 16, rate: 1.3, range: 3, pctHp: { every: 3, pct: 0.04 } }),
     ult: {
       name: 'Combat ultime', desc: 'Coups d\'argent renforcés, attaque plus vite.',
       apply: (s, r) => { s.pctHp!.pct += 0.02 * r; s.rate *= 1 + 0.15 * r; },
@@ -180,7 +180,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'yasuo', name: 'Yasuo', title: "L'Implacable", role: 'Combattant', region: 'Ionia',
     color: '#5fa8d3', rarity: 3,
     passive: 'Voie du vagabond : 50 % de chance de coup critique.',
-    base: base({ dmg: 13, rate: 1.2, range: 2.2, crit: { chance: 0.5, mult: 1.8 } }),
+    base: base({ dmg: 19, rate: 1.35, range: 2.4, crit: { chance: 0.5, mult: 2 } }),
     ult: {
       name: 'Dernier souffle', desc: 'Critiques plus forts, peut projeter (étourdir).',
       apply: (s, r) => { s.crit!.mult += 0.3 * r; s.stun = { chance: 0.05 * r, dur: 1 }; },
@@ -194,7 +194,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'heimer', name: 'Heimerdinger', title: "L'Inventeur révéré", role: 'Mage', region: 'Piltover',
     color: '#f4d35e', rarity: 2,
     passive: 'Tourelles H-28G : attaque 3 cibles à la fois.',
-    base: base({ dmg: 7, rate: 1, range: 3, type: 'multi', targets: 3 }),
+    base: base({ dmg: 9.5, rate: 1, range: 3, type: 'multi', targets: 3 }),
     ult: {
       name: 'AMÉLIORATION !!!', desc: '+1 cible par rang, plus de dégâts.',
       apply: (s, r) => { s.targets += r; s.dmg *= 1 + 0.1 * r; },
@@ -235,8 +235,8 @@ export const CHAMPIONS: ChampionDef[] = [
   {
     id: 'zed', name: 'Zed', title: 'Le Maître des ombres', role: 'Assassin', region: 'Ionia',
     color: '#c0392b', rarity: 3,
-    passive: 'Mépris des faibles : tous les 3 coups, dégâts x2.',
-    base: base({ dmg: 22, rate: 0.8, range: 2, everyN: { n: 3, mult: 2 } }),
+    passive: 'Ombre vivante : frappe 2 cibles ; tous les 3 coups, dégâts x2.',
+    base: base({ dmg: 30, rate: 1, range: 2.4, type: 'multi', targets: 2, everyN: { n: 3, mult: 2 } }),
     ult: {
       name: 'Marque de la mort', desc: 'Coups spéciaux plus forts, bonus contre les boss.',
       apply: (s, r) => { s.everyN!.mult += 0.5 * r; s.bossMult = 1 + 0.25 * r; },
@@ -265,8 +265,8 @@ export const CHAMPIONS: ChampionDef[] = [
   {
     id: 'nasus', name: 'Nasus', title: 'Le Gardien des sables', role: 'Combattant', region: 'Shurima',
     color: '#c9a227', rarity: 3, reward: 'jungle',
-    passive: 'Frappe siphonnante : +0,2 dégât PERMANENT par élimination.',
-    base: base({ dmg: 16, rate: 0.9, range: 2, killStack: { amount: 0.2, persistent: true } }),
+    passive: 'Frappe siphonnante : chaque élimination augmente ses dégâts pour toujours (gain de plus en plus lent).',
+    base: base({ dmg: 26, rate: 1, range: 2.2, killStack: { amount: 0.2, persistent: true } }),
     ult: {
       name: 'Fureur des sables', desc: 'Accumule plus vite, portée accrue.',
       apply: (s, r) => { s.killStack!.amount += 0.1 * r; s.range += 0.3 * r; },
@@ -280,7 +280,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'veigar', name: 'Veigar', title: 'Le Petit Maître du mal', role: 'Mage', region: 'Bandle',
     color: '#6c5ce7', rarity: 3, reward: 'aram',
     passive: 'Puissance phénoménale : +3 % de dégâts par élimination (pendant la partie). x1,5 contre les boss.',
-    base: base({ dmg: 18, rate: 0.8, range: 3.2, killStack: { amount: 0.03, persistent: false }, bossMult: 1.5 }),
+    base: base({ dmg: 20, rate: 0.85, range: 3.2, killStack: { amount: 0.03, persistent: false }, bossMult: 1.5 }),
     ult: {
       name: 'Big Bang', desc: 'Dégâts contre les boss renforcés.',
       apply: (s, r) => { s.bossMult! += 0.5 * r; },
@@ -336,7 +336,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'darius', name: 'Darius', title: 'La Main de Noxus', role: 'Combattant', region: 'Noxus',
     color: '#b3283a', rarity: 3, reward: 'noxus',
     passive: 'Hémorragie : fait saigner ses cibles pendant 5 s.',
-    base: base({ dmg: 18, rate: 0.8, range: 2.4, burn: { mult: 0.6, dur: 5 } }),
+    base: base({ dmg: 27, rate: 0.9, range: 2.4, burn: { mult: 0.6, dur: 5 } }),
     ult: {
       name: 'Guillotine noxienne', desc: 'Exécutions régulières aux dégâts massifs.',
       apply: (s, r) => { s.everyN = { n: Math.max(2, 5 - r), mult: 2 + r }; },
