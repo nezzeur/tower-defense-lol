@@ -7,6 +7,9 @@ import { enemyName, isArena, isUnlocked, pct, rewardChance, rewardFor, stars, te
 import { store } from '../save';
 import { esc, mapThumb, portrait, starRow, ui } from './common';
 import { render } from './index';
+import { setAmbient } from './backdrop';
+import { CHAMPIONS } from '../data/champions';
+import { ITEMS } from '../data/items';
 
 let selectedRegion: string | null | undefined;
 let worldAnim: WorldAnim | null = null;
@@ -19,7 +22,7 @@ function worldUrl(): string {
 }
 
 /** Highest unlocked map not yet completed: where the player should go next. */
-function currentMap(): string {
+export function currentMap(): string {
   return [...MAPS].reverse().find((m) => isUnlocked(m) && (store.data.best[m.id] ?? 0) < m.waves)?.id ?? MAPS[0].id;
 }
 
@@ -46,6 +49,26 @@ function mapCard(id: string, cur: string): string {
   </div>`;
 }
 
+/** Where the player stands in the whole game: the next map, and every long-term goal with its gauge. */
+function journey(cur: string): string {
+  const m = MAP_BY_ID[cur], d = store.data;
+  const cleared = MAPS.filter((x) => (d.best[x.id] ?? 0) >= x.waves).length;
+  const all = cleared === MAPS.length;
+  const endless = Math.max(0, ...Object.values(d.endless));
+  const gauge = (label: string, value: string, ratio: number, title: string) => `<div class="jr-stat" title="${esc(title)}">
+    <span>${label}</span><b>${value}</b><div class="progress"><div style="width:${Math.min(100, ratio * 100)}%"></div></div></div>`;
+  return `<section class="journey">
+    <div class="jr-next"><span>${all ? 'Campagne terminée' : 'Prochain objectif'}</span>
+      <b>${all ? 'Mode infini' : esc(m.name)}</b>
+      <small>${all ? `Record : ${endless} vagues. Le boss revient toutes les 25 vagues.` : `${esc(REGIONS.find((r) => r.id === REGION_OF[cur])?.name ?? '')} · vague ${d.best[cur] ?? 0} sur ${m.waves}`}</small></div>
+    ${gauge('Étoiles', `${stars()} / ${MAPS.length * 5}`, stars() / (MAPS.length * 5), 'Jusqu\'à 5 ★ par carte')}
+    ${gauge('Cartes', `${cleared} / ${MAPS.length}`, cleared / MAPS.length, 'Cartes dont la dernière vague est battue')}
+    ${gauge('Champions', `${d.owned.length} / ${CHAMPIONS.length}`, d.owned.length / CHAMPIONS.length, 'Coffres, boss de carte et mode infini')}
+    ${gauge('Objets', `${d.items.length} / ${ITEMS.length}`, d.items.length / ITEMS.length, 'Boutique et forge')}
+    ${gauge('Infini', `${endless} vagues`, endless / 100, 'Meilleur record en mode infini, toutes cartes confondues')}
+  </section>`;
+}
+
 export function mapsScreen(): string {
   const cur = currentMap();
   if (selectedRegion === undefined) selectedRegion = REGION_OF[cur];
@@ -66,6 +89,7 @@ export function mapsScreen(): string {
     style="left:${(r.lx / WW) * 100}%;top:${(r.ly / WH) * 100}%;--c:${r.color}">${esc(r.name)}</div>`).join('');
 
   const reg = REGIONS.find((r) => r.id === selectedRegion);
+  setAmbient(reg?.color ?? null);
   const panel = reg
     ? `<div class="region-head" style="--c:${reg.color}">
         <button class="btn small-btn" data-region="">← Vue d'ensemble</button>
@@ -84,7 +108,7 @@ export function mapsScreen(): string {
           ${r.maps.includes(cur) ? '<span class="cur-tag">Objectif actuel</span>' : ''}
         </button>`).join('')}</div>`;
 
-  return `<div class="atlas">
+  return `${journey(cur)}<div class="atlas">
     <div class="world" id="world">
       <div class="cam" id="cam">
         <img class="world-img" src="${worldUrl()}" alt="">

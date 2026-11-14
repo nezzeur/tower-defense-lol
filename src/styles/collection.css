@@ -1,7 +1,7 @@
 /* Collection: filters, champion tiles, detail panel */
 .coll-layout { display: grid; grid-template-columns: 1fr 380px; gap: 18px; align-items: start; }
 .coll-head h2 { margin-bottom: 2px; }
-.filters { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 14px; padding: 10px 12px; background: var(--fill); border: 1px solid var(--gold5); }
+.filters { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 14px; padding: 10px 12px; background: var(--fill); border: 1px solid var(--gold5); backdrop-filter: blur(10px); }
 .fgroup select { padding: 4px 8px; }
 .coll-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 12px; }
 .coll-card { --rc: var(--gold5); position: relative; aspect-ratio: 308 / 480; padding: 0; overflow: hidden; text-align: left; border: 2px solid var(--rc); animation: fadeUp 0.35s ease both; animation-delay: var(--d); }
