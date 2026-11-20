@@ -6,7 +6,7 @@ import { store } from './save';
 import type { ChampionDef, MapDef, Stats } from './types';
 
 export const MAX_LEVEL = 150;
-export const ULT_LEVELS = [6, 11, 16];
+export const ULT_LEVELS = [10, 30, 60];
 export const START_LIVES = 20;
 export const MAX_LIVES = 30;
 
@@ -20,7 +20,7 @@ export const BALANCE = {
   levelCostBase: 40,
   levelCostGrowth: 1.12,
   /** Enemy HP growth per wave inside a map (compounding, on top of +10 %/wave linear). */
-  hpPerWave: 1.06,
+  hpPerWave: 1.07,
   /** Gold scales with map multiplier ^ this. */
   goldMultExp: 0.95,
   /** Kill gold growth per wave (linear). */
@@ -31,13 +31,18 @@ export const BALANCE = {
    * matched), so the mode stays tense, yet wave 200+ remains reachable with highly levelled champions and blessings.
    */
   endless: { start: 1.25, linear: 0.06, growth: 1.006, levelShare: 0.65, refLevel: 18, refLevelPerMap: 2.05 },
-  chestBase: 120,
-  chestGrowth: 1.45,
+  /** Final bosses kill the nexus on arrival, so they must die in one pass: their HP is scaled down. */
+  bossHp: 0.35,
+  chestBase: 400,
+  chestGrowth: 1.55,
 };
 
 export const level = (id: string): number => store.data.levels[id] ?? 1;
 export const ultRank = (lvl: number): number => ULT_LEVELS.filter((l) => lvl >= l).length;
-export const levelCost = (lvl: number): number => Math.round(BALANCE.levelCostBase * BALANCE.levelCostGrowth ** (lvl - 1));
+/** Levelling a rarer champion costs more (index = rarity: 1 common, 2 rare, 3 epic, 4 legendary). */
+export const RARITY_COST = [1, 1, 1.6, 2.5, 4];
+export const levelCost = (lvl: number, rarity = 1): number =>
+  Math.round(BALANCE.levelCostBase * BALANCE.levelCostGrowth ** (lvl - 1) * (RARITY_COST[rarity] ?? 1));
 
 /** Damage multiplier from permanent kill stacks: +3 % x sqrt(stacks). 1000 kills (200 stacks) = +42 %. */
 export const permStackMult = (stacks: number): number => 1 + 0.03 * Math.sqrt(Math.max(0, stacks));
@@ -179,10 +184,10 @@ export function chestPool(): ChampionDef[] {
 
 export const CHEST_CHOICES = 3;
 /** After this many chests without an epic, the next offer guarantees one. */
-export const EPIC_PITY = 3;
+export const EPIC_PITY = 6;
 
 function weightedPick(pool: ChampionDef[]): ChampionDef {
-  const weight = (c: ChampionDef) => (c.rarity === 1 ? 6 : c.rarity === 2 ? 3 : 1);
+  const weight = (c: ChampionDef) => (c.rarity === 1 ? 12 : c.rarity === 2 ? 4 : 1);
   let roll = Math.random() * pool.reduce((n, c) => n + weight(c), 0);
   return pool.find((c) => (roll -= weight(c)) < 0) ?? pool[pool.length - 1];
 }
@@ -241,7 +246,7 @@ export const pct = (v: number): string => `${v < 0.1 ? (v * 100).toFixed(1).repl
 
 export function tryLevelUp(id: string): boolean {
   const lvl = level(id);
-  const cost = levelCost(lvl);
+  const cost = levelCost(lvl, CHAMP_BY_ID[id]?.rarity);
   if (lvl >= MAX_LEVEL || store.data.gold < cost) return false;
   store.data.gold -= cost;
   store.data.levels[id] = lvl + 1;
@@ -279,8 +284,8 @@ export function craftItem(itemId: string): boolean {
   return true;
 }
 
-/** Endless mode opens on a map once its last wave has been beaten. */
+/** Endless mode exists only on region arenas, and opens once the arena's last wave has been beaten. */
 export const endlessUnlocked = (mapId: string): boolean => {
   const m = MAPS.find((x) => x.id === mapId);
-  return !!m && (store.data.best[mapId] ?? 0) >= m.waves;
+  return !!m && isArena(m) && (store.data.best[mapId] ?? 0) >= m.waves;
 };

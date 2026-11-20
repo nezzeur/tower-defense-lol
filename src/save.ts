@@ -33,6 +33,8 @@ export interface SaveData {
   /** Targeting priority per champion (default 'first'). */
   priorities: Record<string, Priority>;
   speed: number;
+  /** Regions whose opening was already celebrated on the world map (undefined: fill silently on first visit). */
+  regionsSeen?: string[];
   auto: boolean;
   /** Cast active ultimates automatically when they are worth it. */
   autoUlt: boolean;
@@ -84,6 +86,9 @@ function sanitize(raw: unknown): SaveData {
   if (!d.mats || typeof d.mats !== 'object' || Array.isArray(d.mats)) d.mats = {};
   d.autoUlt = d.autoUlt === true;
   d.lowFx = d.lowFx === true;
+  // Game speed is x1 or x2 only
+  d.speed = d.speed === 2 ? 2 : 1;
+  if (d.regionsSeen !== undefined && !Array.isArray(d.regionsSeen)) d.regionsSeen = undefined;
   if (!d.priorities || typeof d.priorities !== 'object' || Array.isArray(d.priorities)) d.priorities = {};
   return d;
 }

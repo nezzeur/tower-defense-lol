@@ -597,7 +597,8 @@ export class Battle {
       this.over = true;
       if (this.visual) sfx('victory');
       this.ev.onEnd(true, this.wave);
-      if (d.auto) this.autoT = 3;
+      // On screen the player chooses what comes next (replay, next map...); only the headless bot loops
+      if (d.auto && !this.visual) this.autoT = 3;
     } else if (d.auto) {
       this.autoT = 1;
     }

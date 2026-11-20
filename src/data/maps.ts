@@ -264,8 +264,8 @@ const REGION_PLANS: RegionPlan[] = [
 ];
 
 /** Waves on regular maps; region arenas (last map) have FINAL_WAVES. */
-const WAVES = 30;
-const FINAL_WAVES = 40;
+const WAVES = 50;
+const FINAL_WAVES = 60;
 
 /** Difficulty multiplier by global map index (tuned with scripts/sim.ts). */
 export const MAP_CURVE = { base: 1.5, growth: 1.25 };

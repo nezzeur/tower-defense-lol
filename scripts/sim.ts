@@ -87,7 +87,7 @@ function spend(b: Battle): void {
       },
     });
     for (const t of b.towers) {
-      if (level(t.def.id) < MAX_LEVEL) opts.push({ cost: levelCost(level(t.def.id)), run: () => tryLevelUp(t.def.id) });
+      if (level(t.def.id) < MAX_LEVEL) opts.push({ cost: levelCost(level(t.def.id), t.def.rarity), run: () => tryLevelUp(t.def.id) });
     }
     for (const it of ITEMS) {
       if (!store.data.items.includes(it.id)) {

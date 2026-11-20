@@ -3,6 +3,7 @@ import { CREATURE_HEIGHT } from '../art/creatures';
 import { sfx } from '../audio';
 import { ENEMIES } from '../data/enemies';
 import { store } from '../save';
+import { BALANCE } from '../game';
 import { type Enemy, TILE } from './model';
 import { burst, stop } from './effects';
 import { damage } from './combat';
@@ -11,7 +12,7 @@ import type { Battle } from './battle';
 /** Spawns a monster at the start of the next lane, or at a given point of a lane (splitting monsters). */
 export function spawn(bt: Battle, id: string, at?: { s: number; lane: number }): void {
   const def = ENEMIES[id];
-  const hp = def.hp * bt.waveHp();
+  const hp = def.hp * bt.waveHp() * (def.boss ? BALANCE.bossHp : 1);
   const lane = at ? at.lane : bt.spawnCount++ % bt.lanes.length;
   const s0 = at?.s ?? 0;
   const p = bt.posAt(s0, lane);
@@ -68,8 +69,10 @@ export function updateEnemies(bt: Battle, dt: number): void {
     e.x = p.x;
     e.y = p.y;
     if (e.s >= bt.lanes[e.lane].len) {
-      bt.lives -= e.def.leak;
-      bt.livesLost += e.def.leak;
+      // A boss reaching the nexus destroys it outright; other monsters cost their leak
+      const loss = e.def.boss ? Math.max(0, bt.lives) : e.def.leak;
+      bt.lives -= loss;
+      bt.livesLost += loss;
       if (bt.visual) sfx('lifeLost');
       bt.fx.push({ kind: 'ring', x: e.x, y: e.y, r: 40, t: 0, max: 0.5, color: '#ff4d4d' });
       bt.nexusHurt = 0.5;
@@ -77,8 +80,7 @@ export function updateEnemies(bt: Battle, dt: number): void {
       burst(bt, e.x, e.y, '#ff5a5a', e.def.boss ? 30 : 8, 120);
       bt.vfx?.light(e.x, e.y, e.def.boss ? 170 : 80, '#ff4d4d', 0.7, 0.4);
       if (e.def.boss) stop(bt, 0.1);
-      // A boss that reaches the nexus walks the lane again instead of vanishing.
-      if (e.def.boss) e.s = 0; else e.dead = true;
+      e.dead = true;
       if (bt.lives <= 0 && !bt.over) bt.lose();
     }
   }

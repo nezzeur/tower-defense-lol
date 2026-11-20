@@ -130,7 +130,9 @@ export function drawEnemy(bt: Battle, g: CanvasRenderingContext2D, e: Enemy): vo
   }
   if (e.burns.length && Math.random() < 0.35) burst(bt, x + (Math.random() - 0.5) * w * 0.6, y - h * 0.5, Math.random() < 0.5 ? '#ffb347' : '#ff5a2a', 1, 34, 2);
   // Health bar: dark frame coloured by tier, gradient fill, segments
-  const bw = Math.max(30, Math.min(110, w * 0.95)), pct = Math.max(0, Math.min(1, e.hp / e.maxHp)), by = y - h - 11;
+  const bw = Math.max(30, Math.min(110, w * 0.95)), pct = Math.max(0, Math.min(1, e.hp / e.maxHp));
+  // Tall monsters near the top edge keep their bar (and the pips above it) inside the board
+  const by = Math.max(16, y - h - 11);
   g.fillStyle = d.boss ? '#c084fc' : epic ? '#c8aa6e' : '#010a13';
   g.beginPath(); g.roundRect(x - bw / 2 - 2.5, by - 2.5, bw + 5, 9, 3); g.fill();
   g.fillStyle = '#010a13';

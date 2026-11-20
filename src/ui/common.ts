@@ -107,7 +107,7 @@ export function levelButtons(def: ChampionDef): string {
   const lvl = level(def.id);
   if (lvl >= MAX_LEVEL) return '<div class="muted">Niveau maximum</div>';
   return `<div class="row">
-    <button class="btn gold" data-lvl="${def.id}" data-cost="${levelCost(lvl)}">Niveau ${lvl + 1} — ◆ ${fmt(levelCost(lvl))}</button>
+    <button class="btn gold" data-lvl="${def.id}" data-cost="${levelCost(lvl, def.rarity)}">Niveau ${lvl + 1} — ◆ ${fmt(levelCost(lvl, def.rarity))}</button>
     <button class="btn" data-lvl10="${def.id}" title="Monte de 10 niveaux tant que l'or suffit">+10</button>
   </div>`;
 }

@@ -8,9 +8,9 @@ import { BOON_BY_ID, BOON_CHANCE, BOON_MAX } from '../data/boons';
 import { ENEMIES, enemyTraits } from '../data/enemies';
 import { lootRolls, lootTable, MAT_BY_ID, MATERIALS, relicOf } from '../data/loot';
 import { matChip } from './inventory';
-import { MAP_BY_ID } from '../data/maps';
+import { MAP_BY_ID, MAPS } from '../data/maps';
 import { REGIONS } from '../art/worldArt';
-import { champ, ENDLESS_LOOT, endlessChampMap, endlessLevelFactor, endlessRefLevel, endlessUnlocked, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots } from '../game';
+import { champ, ENDLESS_LOOT, endlessChampMap, endlessLevelFactor, endlessRefLevel, endlessUnlocked, enemyName, fmt, level, pct, rewardChance, rewardFor, rollReward, stars, teamSlots, isUnlocked } from '../game';
 import { sfx } from '../audio';
 import { setMusic, setMusicIntensity } from '../music';
 import { tutorialTick } from './tutorial';
@@ -22,7 +22,7 @@ import { go } from './index';
 export function startBattle(mapId: string): void {
   const map = MAP_BY_ID[mapId];
   ui.screen = 'battle';
-  const speeds = [1, 2, 4, 8];
+  const speeds = [1, 2];
   app.innerHTML = `<div class="battle">
     <div class="bbar">
       <button class="btn" data-leave>← Cartes</button>
@@ -436,6 +436,9 @@ function showResult(win: boolean, wave: number): void {
       persist();
     }
   }
+  // After a win the player picks what comes next: the following map (when open), a replay, endless...
+  const idx = MAPS.indexOf(ui.battle.map), nextMap = MAPS[idx + 1];
+  const next = win && nextMap && isUnlocked(nextMap) ? nextMap : null;
   ov.innerHTML = `<div class="result ${win ? 'win' : 'lose'}">
     <h2>${win ? 'Victoire !' : 'Nexus détruit'}</h2>
     <p>${win ? `${esc(ui.battle.map.name)} terminée !` : ui.battle.endless
@@ -446,11 +449,12 @@ function showResult(win: boolean, wave: number): void {
     ${reward}
     ${runStats(ui.battle)}
     ${lootRow(ui.battle.runLoot) ? `<div class="small muted">Butin de la partie</div><div class="result-loot">${lootRow(ui.battle.runLoot)}</div>` : ''}
-    <div class="row"><button class="btn gold" data-mode="normal">Rejouer</button>
+    <div class="row">${next ? `<button class="btn gold" data-map="${next.id}">Carte suivante ▶</button>` : ''}
+      <button class="btn ${next ? '' : 'gold'}" data-mode="normal">Rejouer</button>
       ${endlessUnlocked(ui.battle.map.id) ? '<button class="btn boss" data-mode="endless">Mode infini ∞</button>' : ''}
       ${ui.battle.canChallengeBoss() ? '<button class="btn boss" data-mode="boss">Boss ⚔</button>' : ''}
       <button class="btn" data-leave>Changer de carte</button></div>
-    ${store.data.auto ? '<p class="small muted">Mode auto : redémarrage automatique…</p>' : ''}
+    ${store.data.auto && !win ? '<p class="small muted">Mode auto : redémarrage automatique…</p>' : ''}
   </div>`;
   ov.classList.remove('hidden');
 }

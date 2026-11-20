@@ -3,8 +3,8 @@ import { buildWorld, NODE_PX, REGION_OF, REGIONS, S, WH, WorldAnim, WW, type Reg
 import { MATERIALS } from '../data/loot';
 import { MAPS, MAP_BY_ID } from '../data/maps';
 import { matChip } from './inventory';
-import { enemyName, isArena, isUnlocked, pct, rewardChance, rewardFor, stars, teamSlots, unlockReason } from '../game';
-import { store } from '../save';
+import { endlessUnlocked, enemyName, isArena, isUnlocked, pct, rewardChance, rewardFor, stars, teamSlots, unlockReason } from '../game';
+import { persist, store } from '../save';
 import { esc, mapThumb, portrait, starRow, ui } from './common';
 import { render } from './index';
 import { setAmbient } from './backdrop';
@@ -39,7 +39,7 @@ function mapCard(id: string, cur: string): string {
       <div class="level-title"><b>${esc(m.name)}</b>${done ? '<span class="done">✔</span>' : ''}</div>
       <div class="muted small">${esc(m.subtitle)}</div>
       <div class="feat-icons">${(m.lanes?.length ? '<span title="Plusieurs voies">⇉</span>' : '') + [...new Set((m.features ?? []).map((f) => f.kind))].map((k) => `<span title="${esc(FEATURE_INFO[k].name)}">${FEATURE_INFO[k].icon}</span>`).join('')}</div>
-      ${open ? `${starRow(stars(m.id))}<div class="small">Record <b>${best}</b>/${m.waves} · Boss : ${esc(enemyName(m.finalBoss))}</div>${done ? `<div class="small endless-rec">∞ Mode infini · record <b>${store.data.endless[m.id] ?? 0}</b></div>` : ''}`
+      ${open ? `${starRow(stars(m.id))}<div class="small">Record <b>${best}</b>/${m.waves} · Boss : ${esc(enemyName(m.finalBoss))}</div>${endlessUnlocked(m.id) ? `<div class="small endless-rec">∞ Mode infini · record <b>${store.data.endless[m.id] ?? 0}</b></div>` : ''}`
         : `<div class="lock small">🔒 ${esc(unlockReason(m) ?? '')}</div>`}
       <div class="level-foot">
         ${rw ? `<span class="reward-chip" title="Chance que le boss final lâche ce champion à chaque victoire.">${portrait(rw, 22, !store.data.owned.includes(rw.id))}${store.data.owned.includes(rw.id) ? esc(rw.name) : `Butin du boss · ${pct(rewardChance(m.id))}`}</span>` : '<span></span>'}
@@ -69,7 +69,35 @@ function journey(cur: string): string {
   </section>`;
 }
 
+/** Regions the player can enter (their first map is open), in campaign order. */
+function openRegions(): string[] {
+  return [...new Set(MAPS.filter((m) => m.region && isUnlocked(m)).map((m) => m.region!))];
+}
+
+/** Celebrates a region that opened since the last visit of the world map (once per region). */
+function celebrateRegions(): void {
+  const d = store.data, open = openRegions();
+  if (!d.regionsSeen) { d.regionsSeen = open; persist(); return; }
+  const fresh = open.filter((r) => !d.regionsSeen!.includes(r));
+  if (!fresh.length) return;
+  d.regionsSeen.push(...fresh);
+  persist();
+  const reg = REGIONS.find((r) => r.id === fresh[fresh.length - 1]);
+  if (!reg || document.querySelector('.region-unlock')) return;
+  selectedRegion = reg.id;
+  const el = document.createElement('div');
+  el.className = 'region-unlock';
+  el.style.setProperty('--rc', reg.color);
+  el.innerHTML = `<div class="ru-rays"></div><div class="ru-card">
+    <span>Nouveau continent débloqué</span><b>${esc(reg.name)}</b><small>${esc(reg.desc)}</small></div>`;
+  const close = () => { el.classList.add('out'); setTimeout(() => el.remove(), 500); };
+  el.addEventListener('click', close);
+  setTimeout(close, 4200);
+  document.body.append(el);
+}
+
 export function mapsScreen(): string {
+  celebrateRegions();
   const cur = currentMap();
   if (selectedRegion === undefined) selectedRegion = REGION_OF[cur];
   const firstMap = (r: Region) => Math.min(...r.maps.map((id) => MAPS.findIndex((m) => m.id === id)));
