@@ -166,7 +166,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'kogmaw', name: "Kog'Maw", title: 'La Gueule des abysses', role: 'Tireur', region: 'Néant',
     color: '#b5d84a', rarity: 2,
     passive: 'Barrage bio-arcanique : vitesse d\'attaque qui monte jusqu\'à +80 %.',
-    base: base({ dmg: 7, rate: 1.6, range: 3.5, ramp: { perHit: 0.03, max: 0.8 } }),
+    base: base({ dmg: 7, rate: 1.6, range: 3.2, ramp: { perHit: 0.03, max: 0.8 } }),
     ult: {
       name: 'Artillerie vivante', desc: 'Portée accrue, dégâts en % des PV max.',
       apply: (s, r) => { s.range += r; s.pctHp = { every: 4, pct: 0.02 * r }; },
