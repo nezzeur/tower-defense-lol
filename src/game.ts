@@ -112,8 +112,9 @@ export function endlessHp(m: MapDef, n: number, teamLevel: number): number {
   // Arenas (40 waves) restart from the strength of a regular map's last wave, or their endless mode would be out of reach
   return hpScale(m, Math.min(m.waves, ENDLESS_BASE_WAVE)) * endlessWaveFactor(n) * endlessLevelFactor(m, teamLevel);
 }
-export const goldScale = (m: MapDef, w: number): number => (1 + BALANCE.goldPerWave * w) * m.mult ** BALANCE.goldMultExp;
-export const waveBonus = (m: MapDef, w: number): number => Math.round((10 + 3 * w) * m.mult ** BALANCE.goldMultExp);
+/** Gold stops growing after the map's last wave: endless waves pay like that wave, or farming there outpaced everything. */
+export const goldScale = (m: MapDef, w: number): number => (1 + BALANCE.goldPerWave * Math.min(w, m.waves)) * m.mult ** BALANCE.goldMultExp;
+export const waveBonus = (m: MapDef, w: number): number => Math.round((10 + 3 * Math.min(w, m.waves)) * m.mult ** BALANCE.goldMultExp);
 
 export interface Spawn { id: string; delay: number }
 
