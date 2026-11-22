@@ -60,6 +60,8 @@ export interface Tower {
   cd: number;
   hits: number;
   runStacks: number;
+  /** Diminishing kill stacks gained this run (Nasus). */
+  stackCount: number;
   ramp: number;
   angle: number;
   flash: number;

@@ -2,7 +2,7 @@ import { loadingUrl, splashUrl } from '../art/champArt';
 import { CHAMPIONS } from '../data/champions';
 import { ITEMS, ITEM_BY_ID } from '../data/items';
 import { MAPS, MAP_BY_ID } from '../data/maps';
-import { champ, computeStats, fmt, level, MAX_LEVEL, ULT_LEVELS, ultRank, ENDLESS_LOOT, endlessChampMap, pct, permStackMult } from '../game';
+import { champ, computeStats, fmt, level, MAX_LEVEL, ULT_LEVELS, ultRank, ENDLESS_LOOT, endlessChampMap, pct } from '../game';
 import { SYNERGIES, SYN_TIERS, synText } from '../data/synergies';
 import { store } from '../save';
 import type { ChampionDef } from '../types';
@@ -69,7 +69,6 @@ function champDetail(def: ChampionDef): string {
   const lvl = level(def.id);
   const s = computeStats(def);
   const next = lvl < MAX_LEVEL ? computeStats(def, lvl + 1) : null;
-  const stacks = store.data.stacks[def.id];
   const maps = MAPS.filter((m) => store.data.layouts[m.id]?.some((p) => p.id === def.id));
   const item = store.data.equip[def.id] ? ITEM_BY_ID[store.data.equip[def.id]] : null;
   return `<div class="champ-card-hud r${def.rarity}">
@@ -90,7 +89,6 @@ function champDetail(def: ChampionDef): string {
     ${abilityRow(def)}
     <div class="hud-title">Statistiques</div>
     <div class="stat-grid">${statLines(s).map((l) => `<div>${l}</div>`).join('')}</div>
-    ${stacks ? `<div class="run-line"><span>Cumuls permanents</span><b>+${Math.round((permStackMult(stacks) - 1) * 100)} % dégâts</b></div>` : ''}
     <div class="hud-title">Équipement</div>
     <div class="equip-row">${item ? itemIcon(item, 44) : '<span class="item-slot empty">+</span>'}${itemSelect(def)}</div>
     <div class="hud-title">Déployé sur</div>

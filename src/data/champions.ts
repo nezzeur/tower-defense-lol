@@ -67,11 +67,11 @@ export const CHAMPIONS: ChampionDef[] = [
   {
     id: 'jinx', name: 'Jinx', title: 'La Gâchette folle', role: 'Tireur', region: 'Zaun',
     color: '#ff5fa2', rarity: 2,
-    passive: 'Ratatatata ! : la vitesse d\'attaque augmente en tirant (jusqu\'à +60 %).',
-    base: base({ dmg: 7, rate: 2.2, range: 3.2, ramp: { perHit: 0.04, max: 0.6 } }),
+    passive: 'Ratatatata ! : la vitesse d\'attaque augmente en tirant (jusqu\'à +45 %).',
+    base: base({ dmg: 6, rate: 2.2, range: 3.2, ramp: { perHit: 0.04, max: 0.45 } }),
     ult: {
       name: 'Super méga roquette de la mort', desc: 'Les tirs deviennent des roquettes à zone.',
-      apply: (s, r) => { s.type = 'splash'; s.splash = 0.8 + 0.2 * r; s.dmg *= 1 + 0.1 * r; },
+      apply: (s, r) => { s.type = 'splash'; s.splash = 0.7 + 0.2 * r; s.dmg *= 1 + 0.05 * r; },
     },
     active: {
       name: 'Super méga roquette de la mort', desc: 'Roquette géante : gros dégâts de zone.', cd: 70,
@@ -265,8 +265,8 @@ export const CHAMPIONS: ChampionDef[] = [
   {
     id: 'nasus', name: 'Nasus', title: 'Le Gardien des sables', role: 'Combattant', region: 'Shurima',
     color: '#c9a227', rarity: 3, reward: 'jungle',
-    passive: 'Frappe siphonnante : chaque élimination augmente ses dégâts pour toujours (gain de plus en plus lent).',
-    base: base({ dmg: 26, rate: 1, range: 2.2, killStack: { amount: 0.2, persistent: true } }),
+    passive: 'Frappe siphonnante : chaque élimination augmente ses dégâts pendant la partie (gain de plus en plus lent).',
+    base: base({ dmg: 38, rate: 1, range: 2.2, killStack: { amount: 0.6, sqrt: true } }),
     ult: {
       name: 'Fureur des sables', desc: 'Accumule plus vite, portée accrue.',
       apply: (s, r) => { s.killStack!.amount += 0.1 * r; s.range += 0.3 * r; },
@@ -280,7 +280,7 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'veigar', name: 'Veigar', title: 'Le Petit Maître du mal', role: 'Mage', region: 'Bandle',
     color: '#6c5ce7', rarity: 3, reward: 'aram',
     passive: 'Puissance phénoménale : +3 % de dégâts par élimination (pendant la partie). x1,5 contre les boss.',
-    base: base({ dmg: 20, rate: 0.85, range: 3.2, killStack: { amount: 0.03, persistent: false }, bossMult: 1.5 }),
+    base: base({ dmg: 20, rate: 0.85, range: 3.2, killStack: { amount: 0.03 }, bossMult: 1.5 }),
     ult: {
       name: 'Big Bang', desc: 'Dégâts contre les boss renforcés.',
       apply: (s, r) => { s.bossMult! += 0.5 * r; },

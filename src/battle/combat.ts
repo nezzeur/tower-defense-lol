@@ -225,13 +225,13 @@ export function kill(bt: Battle, e: Enemy, src: Tower | null): void {
   src.kills++;
   const ks = src.stats.killStack;
   if (ks) {
-    if (ks.persistent) {
-      const before = store.data.stacks[src.def.id] ?? 0;
-      store.data.stacks[src.def.id] = before + ks.amount;
-      src.stats.dmg *= permStackMult(before + ks.amount) / permStackMult(before);
+    if (ks.sqrt) {
+      // Diminishing stacks, kept as bonus damage like the linear ones so ultimates and burns use them too
+      src.stackCount += ks.amount;
+      src.runStacks = src.stats.dmg * (permStackMult(src.stackCount) - 1);
     } else {
       // Per-run stacks are a fraction of the champion's damage, so they keep their weight at high levels.
-      src.runStacks += ks.amount * src.stats.dmg;
+      src.runStacks = Math.min(src.runStacks + ks.amount * src.stats.dmg, (ks.max ?? Infinity) * src.stats.dmg);
     }
   }
 }

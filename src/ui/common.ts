@@ -82,7 +82,7 @@ export function statLines(s: Stats): string[] {
   if (s.execute) L.push(`Achève sous <b>${Math.round(s.execute * 100)} %</b> PV`);
   if (s.trueSight) L.push('Ignore <b>boucliers</b> et vol');
   if (s.bossMult) L.push(`Contre boss <b>x${s.bossMult.toFixed(2)}</b>`);
-  if (s.killStack) L.push(s.killStack.persistent ? `Cumul/élim. <b>+${s.killStack.amount.toFixed(2)}</b> (permanent)` : `Cumul/élim. <b>+${Math.round(s.killStack.amount * 100)} %</b> (partie)`);
+  if (s.killStack) L.push(s.killStack.sqrt ? `Cumul/élim. <b>+${s.killStack.amount.toFixed(2)}</b> (partie, de plus en plus lent)` : `Cumul/élim. <b>+${Math.round(s.killStack.amount * 100)} %</b> (partie)`);
   return L;
 }
 

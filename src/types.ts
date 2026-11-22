@@ -24,7 +24,7 @@ export interface Stats {
   /** Every N hits, multiply damage. */
   everyN?: { n: number; mult: number };
   /** Damage gained per kill. Persistent stacks survive between runs. */
-  killStack?: { amount: number; persistent: boolean };
+  killStack?: { amount: number; /** Diminishing stacks (sqrt), else linear % of damage. Both reset each run. */ sqrt?: boolean; /** Per-run cap, as a fraction of damage. */ max?: number };
   /** Bonus fraction of gold on kills by this champion. */
   killGold?: number;
   livesPerWave?: number;

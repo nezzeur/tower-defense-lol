@@ -233,7 +233,7 @@ export class Battle {
     const def = champ(id);
     const t: Tower = {
       def, c, r, x: (c + 0.5) * TILE, y: (r + 0.5) * TILE, stats: this.statsAt(def, c, r), cd: 0.3,
-      hits: 0, runStacks: 0, ramp: 0, angle: 0, flash: 0, kills: 0, dmgDone: 0,
+      hits: 0, runStacks: 0, stackCount: 0, ramp: 0, angle: 0, flash: 0, kills: 0, dmgDone: 0,
       ultCd: def.active.cd, buffs: [], priority: store.data.priorities[id] ?? 'first',
       aim: 0, face: 1, sw: 0, since: 9, period: 1, engaged: false, tgt: null, born: 0, ultT: 9, stunT: 0,
     };
@@ -432,7 +432,7 @@ export class Battle {
     this.spellCd = { smite: 0, heal: 0, exhaust: 0 };
     this.selectedEnemy = null;
     for (const t of this.towers) {
-      t.ultCd = t.def.active.cd; t.buffs = []; t.runStacks = 0; t.ramp = 0; t.hits = 0; t.cd = 0.3; t.dmgDone = 0; t.kills = 0;
+      t.ultCd = t.def.active.cd; t.buffs = []; t.runStacks = 0; t.stackCount = 0; t.ramp = 0; t.hits = 0; t.cd = 0.3; t.dmgDone = 0; t.kills = 0;
       t.engaged = false; t.tgt = null; t.since = 9;
     }
     this.vfx?.clear();

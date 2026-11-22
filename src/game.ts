@@ -44,7 +44,7 @@ export const RARITY_COST = [1, 1, 1.6, 2.5, 4];
 export const levelCost = (lvl: number, rarity = 1): number =>
   Math.round(BALANCE.levelCostBase * BALANCE.levelCostGrowth ** (lvl - 1) * (RARITY_COST[rarity] ?? 1));
 
-/** Damage multiplier from permanent kill stacks: +3 % x sqrt(stacks). 1000 kills (200 stacks) = +42 %. */
+/** Damage multiplier from diminishing kill stacks (Nasus, one run only): +3 % x sqrt(stacks). 1000 kills (200 stacks) = +42 %. */
 export const permStackMult = (stacks: number): number => 1 + 0.03 * Math.sqrt(Math.max(0, stacks));
 
 export function computeStats(def: ChampionDef, lvl = level(def.id)): Stats {
@@ -54,8 +54,6 @@ export function computeStats(def: ChampionDef, lvl = level(def.id)): Stats {
   if (rank > 0) def.ult.apply(s, rank);
   const item = store.data.equip[def.id];
   if (item && ITEM_BY_ID[item]) ITEM_BY_ID[item].apply(s);
-  // Permanent kill stacks (Nasus) multiply damage, with diminishing returns: a flat bonus meant nothing at high levels
-  s.dmg *= permStackMult(store.data.stacks[def.id] ?? 0);
   return s;
 }
 

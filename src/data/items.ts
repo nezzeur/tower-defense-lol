@@ -25,8 +25,8 @@ export const ITEMS: ItemDef[] = [
     apply: (s) => { s.rate *= 1.15; s.crit = { chance: Math.min(1, (s.crit?.chance ?? 0) + 0.1), mult: Math.max(2, s.crit?.mult ?? 0) }; } },
   { id: 'sheen', dd: 3057, category: 'Dégâts', name: 'Brillance', icon: '✨', desc: 'Tous les 4 coups : dégâts x2 (ou +12 % dégâts si le champion a déjà un coup spécial)', price: 45000,
     apply: (s) => { if (s.everyN) s.dmg *= 1.12; else s.everyN = { n: 4, mult: 2 }; } },
-  { id: 'mejai', dd: 3041, category: 'Dégâts', name: 'Voleur d\'âmes de Mejai', icon: '📕', desc: '+1 % de dégâts par élimination pendant la partie (ou +15 % dégâts si le champion cumule déjà)', price: 180000,
-    apply: (s) => { if (s.killStack) s.dmg *= 1.15; else s.killStack = { amount: 0.01, persistent: false }; } },
+  { id: 'mejai', dd: 3041, category: 'Dégâts', name: 'Voleur d\'âmes de Mejai', icon: '📕', desc: '+1 % de dégâts par élimination pendant la partie, jusqu\'à +40 % (ou +10 % dégâts si le champion cumule déjà)', price: 180000,
+    apply: (s) => { if (s.killStack) s.dmg *= 1.1; else s.killStack = { amount: 0.01, max: 0.4 }; } },
   { id: 'runaan', dd: 3085, category: 'Utilitaire', name: 'Ouragan de Runaan', icon: '🌪️', desc: '+1 cible (cible unique, multi-cibles ou rebonds), sinon +20 % dégâts', price: 700000, apply: (s) => extraTarget(s, 1.2) },
   { id: 'ga', dd: 3026, category: 'Utilitaire', name: 'Ange gardien', icon: '👼', desc: '+1 vie à chaque vague terminée', price: 1500000, apply: (s) => { s.livesPerWave = (s.livesPerWave ?? 0) + 1; } },
 
