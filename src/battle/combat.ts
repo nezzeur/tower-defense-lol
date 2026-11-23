@@ -173,7 +173,9 @@ export function hit(bt: Battle, t: Tower, e: Enemy, mult: number): void {
   if (crit) bt.fx.push({ kind: 'text', x: e.x, y: e.y - 18, t: 0, max: 0.8, color: '#ffd84a', text: fmtShort(dmg), size: 21 });
   if (bt.vfx) hitFx(bt, t, e, crit, dmg);
   damage(bt, e, dmg, t, false);
-  if (s.pctHp && t.hits % s.pctHp.every === 0) damage(bt, e, e.maxHp * s.pctHp.pct * bt.pctHpScale(), t, true);
+  // "% of HP" hits: on bosses and epic monsters they take a share of the HP left, not of max HP,
+  // so they wear a boss down but can no longer melt it (Kog'Maw, Lame du roi déchu...)
+  if (s.pctHp && t.hits % s.pctHp.every === 0) damage(bt, e, (e.def.shape === 'boss' ? e.hp : e.maxHp) * s.pctHp.pct * bt.pctHpScale(), t, true);
   if (e.dead) return;
   e.hitFlash = 0.08;
   const hold = grip(e);
