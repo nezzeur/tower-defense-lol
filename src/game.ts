@@ -65,21 +65,16 @@ export function stars(mapId?: string): number {
 
 export const teamSlots = (): number => Math.min(8, 3 + Math.floor(stars() / 8));
 
-/** Stars needed on the previous map of a region to open the next one. */
-export const STARS_TO_ADVANCE = 3;
-
 /**
- * Maps open in order inside a region: each needs 3 stars on the previous one.
+ * Maps open in order: each needs the previous one fully cleared (its last wave beaten).
  * A region's first map opens once the previous region's arena (its last map) is beaten.
  */
 export function unlockReason(m: MapDef): string | null {
   const i = MAPS.indexOf(m);
   if (i <= 0) return null;
   const prev = MAPS[i - 1];
-  if (prev.region === m.region) {
-    return stars(prev.id) >= STARS_TO_ADVANCE ? null : `${STARS_TO_ADVANCE} ★ sur « ${prev.name} »`;
-  }
-  return (store.data.best[prev.id] ?? 0) >= prev.waves ? null : `Bats l'arène « ${prev.name} »`;
+  if ((store.data.best[prev.id] ?? 0) >= prev.waves) return null;
+  return prev.region === m.region ? `Termine « ${prev.name} » (${prev.waves} vagues)` : `Bats l'arène « ${prev.name} »`;
 }
 
 export const isUnlocked = (m: MapDef): boolean => unlockReason(m) === null;

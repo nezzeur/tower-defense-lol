@@ -24,7 +24,7 @@ const fight = () => ui.screen === 'battle' && !!b() && !b()!.over && !b()!.boonO
 const TIPS: Tip[] = [
   // --- World map and menus ---
   { id: 'm-atlas', title: 'Carte du monde', target: '.region-panel, .atlas',
-    text: 'Choisis une région, puis une carte. Chaque carte donne jusqu\'à 5 ★ selon les vagues repoussées : 3 ★ ouvrent la carte suivante, et battre la dernière carte d\'une région ouvre la région suivante.',
+    text: 'Choisis une région, puis une carte. Chaque carte donne jusqu\'à 5 ★ selon les vagues repoussées. Termine une carte (toutes ses vagues) pour ouvrir la suivante ; la dernière carte d\'une région ouvre la région suivante.',
     when: () => on('maps') },
   { id: 'm-champs', title: 'Tes champions', target: '.coll-layout',
     text: 'Chaque champion a un passif, un ultime et une région. Monte leur niveau avec ton or : +8 % de dégâts par niveau, et un palier d\'ultime aux niveaux 6, 11 et 16.',
