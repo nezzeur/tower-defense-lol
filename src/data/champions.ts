@@ -266,10 +266,10 @@ export const CHAMPIONS: ChampionDef[] = [
     id: 'nasus', name: 'Nasus', title: 'Le Gardien des sables', role: 'Combattant', region: 'Shurima',
     color: '#c9a227', rarity: 3, reward: 'jungle',
     passive: 'Frappe siphonnante : chaque élimination augmente ses dégâts pendant la partie (gain de plus en plus lent).',
-    base: base({ dmg: 38, rate: 1, range: 2.2, killStack: { amount: 0.6, sqrt: true } }),
+    base: base({ dmg: 38, rate: 1, range: 2.2, killStack: { amount: 1, sqrt: true } }),
     ult: {
       name: 'Fureur des sables', desc: 'Accumule plus vite, portée accrue.',
-      apply: (s, r) => { s.killStack!.amount += 0.1 * r; s.range += 0.3 * r; },
+      apply: (s, r) => { s.killStack!.amount += 0.2 * r; s.range += 0.3 * r; },
     },
     active: {
       name: 'Fureur des sables', desc: 'Pendant 10 s : +50 % de dégâts, +10 % de vitesse d\'attaque.', cd: 60,
