@@ -94,6 +94,11 @@ app.addEventListener('click', (e) => {
     return render();
   }
   if (d.rankSort) { rank.sort = d.rankSort as typeof rank.sort; rank.rows = null; return render(); }
+  if (d.stay !== undefined) {
+    if (ui.battle) ui.battle.autoT = -1;
+    el.closest('.relaunch')?.remove();
+    return;
+  }
   if (d.acc) {
     e.preventDefault();
     const email = (document.getElementById('acc-email') as HTMLInputElement | null)?.value.trim() ?? '';

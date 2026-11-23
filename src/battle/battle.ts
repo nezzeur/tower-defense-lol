@@ -21,6 +21,9 @@ import { spawn, grip, updateEnemies, updateTurrets } from './enemies';
 import { updateTowers, updateProjs, damage } from './combat';
 import { animate, render } from './render';
 
+/** Seconds the end screen waits for a choice before the same mode starts again. */
+export const RELAUNCH_DELAY = 10;
+
 export class Battle {
   readonly canvas!: HTMLCanvasElement;
   ctx!: CanvasRenderingContext2D;
@@ -45,6 +48,8 @@ export class Battle {
   autoT = -1;
   raf = 0;
   timer = 0;
+  /** Background clock: worker timers keep firing in a hidden tab, where page timers are throttled hard. */
+  clock_: Worker | null = null;
   last = 0;
   lastFrame = 0;
   acc = 0;
@@ -141,12 +146,19 @@ export class Battle {
     bindInput(this);
     this.last = this.lastFrame = performance.now();
     this.raf = requestAnimationFrame(this.frame);
-    this.timer = window.setInterval(this.tick, 50);
+    try {
+      const src = URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 100)'], { type: 'text/javascript' }));
+      this.clock_ = new Worker(src);
+      this.clock_.onmessage = this.tick;
+    } catch {
+      this.timer = window.setInterval(this.tick, 50);
+    }
   }
 
   destroy(): void {
     cancelAnimationFrame(this.raf);
     clearInterval(this.timer);
+    this.clock_?.terminate();
     persist();
   }
 
@@ -499,14 +511,15 @@ export class Battle {
 
   /** Runs the simulation up to `now`; shared by the display loop and the background timer. */
   advance(now: number): void {
-    const dt = Math.max(0, Math.min(1.5, (now - this.last) / 1000));
+    // A hidden tab can still lag behind by seconds: catch up on up to 30 s at once
+    const dt = Math.max(0, Math.min(30, (now - this.last) / 1000));
     this.last = now;
     if (this.paused) return;
     if (this.hitStop > 0) { this.hitStop -= dt; return; }
     this.acc += dt * store.data.speed;
     let steps = 0;
-    while (this.acc >= STEP && steps < 1200) { this.step(STEP); this.acc -= STEP; steps++; }
-    if (steps >= 1200) this.acc = 0;
+    while (this.acc >= STEP && steps < 4000) { this.step(STEP); this.acc -= STEP; steps++; }
+    if (steps >= 4000) this.acc = 0;
   }
 
   // The display loop drives the simulation, so movement is as smooth as the screen allows. Browsers pause
@@ -541,8 +554,11 @@ export class Battle {
     if (this.autoT >= 0) {
       this.autoT -= dt;
       if (this.autoT < 0) {
-        if (this.over) this.restart(false, this.endless);
-        else this.startWave();
+        if (this.over) {
+          // Relaunch in the mode that was played (story, boss or endless) and start its first wave
+          this.restart(this.bossMode, this.endless);
+          this.autoT = 1.5;
+        } else this.startWave();
       }
     }
     if (this.over) return;
@@ -596,9 +612,9 @@ export class Battle {
     } else if (this.wave >= this.map.waves) {
       this.over = true;
       if (this.visual) sfx('victory');
+      // The player has RELAUNCH_DELAY seconds to pick something else (next map...), then the same mode starts again
+      if (this.visual) this.autoT = RELAUNCH_DELAY; else if (d.auto) this.autoT = 3;
       this.ev.onEnd(true, this.wave);
-      // On screen the player chooses what comes next (replay, next map...); only the headless bot loops
-      if (d.auto && !this.visual) this.autoT = 3;
     } else if (d.auto) {
       this.autoT = 1;
     }
@@ -611,8 +627,8 @@ export class Battle {
     this.queue = [];
     if (this.visual) sfx('defeat');
     persist();
+    this.autoT = store.data.auto ? 2.5 : this.visual ? RELAUNCH_DELAY : -1;
     this.ev.onEnd(false, this.wave);
-    if (store.data.auto) this.autoT = 2.5;
     this.ev.onChange();
   }
 

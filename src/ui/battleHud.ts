@@ -454,7 +454,15 @@ function showResult(win: boolean, wave: number): void {
       ${endlessUnlocked(ui.battle.map.id) ? '<button class="btn boss" data-mode="endless">Mode infini ∞</button>' : ''}
       ${ui.battle.canChallengeBoss() ? '<button class="btn boss" data-mode="boss">Boss ⚔</button>' : ''}
       <button class="btn" data-leave>Changer de carte</button></div>
-    ${store.data.auto && !win ? '<p class="small muted">Mode auto : redémarrage automatique…</p>' : ''}
+    ${ui.battle.autoT > 0 ? `<p class="small muted relaunch">Relance automatique (${ui.battle.endless ? 'mode infini' : ui.battle.bossMode ? 'boss' : 'histoire'}) dans <b id="relaunch-s">${Math.ceil(ui.battle.autoT)}</b> s
+      <button class="btn small" data-stay>Rester ici</button></p>` : ''}
   </div>`;
   ov.classList.remove('hidden');
+  // Live countdown until the same mode starts again (driven by the battle clock, so it also runs in a hidden tab)
+  const b = ui.battle;
+  const timer = window.setInterval(() => {
+    const el = document.getElementById('relaunch-s');
+    if (!el || ui.battle !== b || !b.over || b.autoT < 0) { clearInterval(timer); return; }
+    el.textContent = String(Math.max(0, Math.ceil(b.autoT)));
+  }, 250);
 }

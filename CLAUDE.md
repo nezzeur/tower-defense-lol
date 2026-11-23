@@ -15,7 +15,7 @@ Personal, local-only LoL-themed tower defense (PokéPath-like progression). Orig
 ## Layout
 - `src/game.ts` rules: stats, levels (max 150), stars, unlocks (`unlockReason`, `isArena`), economy `BALANCE`, waves, chests
 - `src/battle/` one battle on one map (import from `./battle`, i.e. `battle/index.ts`):
-  - `battle.ts` class `Battle`: board state, placement, saved teams, wave flow, modes, spells, blessings, main loop (`step`, rAF `frame` drives the sim, the 50 ms timer only takes over in a hidden tab)
+  - `battle.ts` class `Battle`: board state, placement, saved teams, wave flow, modes, spells, blessings, main loop (`step`, rAF `frame` drives the sim; in a hidden tab a Web Worker clock (`clock_`, 100 ms) takes over and `advance` catches up to 30 s)
   - `model.ts` shapes and constants (`Enemy`, `Tower`, `Proj`, `Fx`, `TILE`, `SPELLS`, `PRIORITIES`, `TUNE`)
   - `enemies.ts` spawn, movement, traits, boss abilities (`useAbility`), allied turrets
   - `combat.ts` targeting, projectiles, `hit`, `damage`, `kill`, loot
@@ -42,7 +42,7 @@ Personal, local-only LoL-themed tower defense (PokéPath-like progression). Orig
 - After any change: `npm run check` (typecheck, build, short headless sim).
 
 ## Game state
-- 5 regions ("villes"): Faille 5 maps, Demacia 6, Freljord 7, Noxus 8, Ionia 9. Regular maps 50 waves, last map = arena (60). Game speed x1/x2 only. A final boss reaching the nexus = instant defeat (`BALANCE.bossHp` 0.35 scales boss HP so one pass is fair). Victory never auto-restarts on screen: the end screen offers next map / replay. New region opened: one-time reveal on the atlas (save `regionsSeen`). Clearing the previous map (all its waves) opens the next; arena opens next region.
+- 5 regions ("villes"): Faille 5 maps, Demacia 6, Freljord 7, Noxus 8, Ionia 9. Regular maps 50 waves, last map = arena (60). Game speed x1/x2 only. A final boss reaching the nexus = instant defeat (`BALANCE.bossHp` 0.35 scales boss HP so one pass is fair). End screen (win or loss) offers next map / replay; without a click the same mode (story, boss, endless) relaunches after `RELAUNCH_DELAY` (10 s), "Rester ici" cancels. New region opened: one-time reveal on the atlas (save `regionsSeen`). Clearing the previous map (all its waves) opens the next; arena opens next region.
 - Difficulty `mult = 1.5 * 1.25^index * laneFactor` (raised from 1.24 after ultimates + synergies); bot clears all in ~12-14h (noisy).
 - Shurima, Piltover, Shadow Isles shelved (hand maps kept in `HAND`, decorative on atlas).
 - Active ultimates: `ChampionDef.active` (cd 40-80s, effect `UltFx`: burst/control/buff/execute/gold/lives), cast from HUD buttons or keys 1-9; `Battle.castUlt`; damage scaled by `TUNE.ult` (0.25, sim-tuned). `def.ult` = passive upgrade at levels 10/30/60 (`ULT_LEVELS`) ("Rang d'ultime").
