@@ -1,6 +1,6 @@
 import { chestIdleHTML } from '../art/chest';
 import { SHOP_ITEMS as ITEMS } from '../data/items';
-import { champ, CHEST_CHOICES, chestPool, chestPrice, EPIC_PITY, fmt } from '../game';
+import { champ, CHEST_CHOICES, chestPool, chestPrice, EPIC_PITY, fmt, CHEST_WEIGHT } from '../game';
 import { store } from '../save';
 import { artCard, chip, esc, itemIcon, portrait, RARITY, ROLE_ICON } from './common';
 
@@ -12,8 +12,10 @@ export function shopScreen(): string {
   const offer = store.data.chestOffer;
   const pity = Math.max(0, EPIC_PITY - store.data.chestsSinceEpic);
   const byRar = [1, 2, 3].map((r) => pool.filter((c) => c.rarity === r).length);
-  const wsum = byRar[0] * 6 + byRar[1] * 3 + byRar[2];
-  const odds = [byRar[0] * 6, byRar[1] * 3, byRar[2]].map((w) => (wsum ? Math.round((w / wsum) * 100) : 0));
+  const weights = byRar.map((n, i) => n * CHEST_WEIGHT[i + 1]);
+  const wsum = weights.reduce((a, b) => a + b, 0);
+  // Chance per card drawn (one of the 3), rounded with one decimal under 10 %
+  const odds = weights.map((w) => { const p = wsum ? (w / wsum) * 100 : 0; return p < 10 ? p.toFixed(1).replace('.0', '') : String(Math.round(p)); });
   const chestBody = offer
     ? `<div class="offer-h">Choisis ton champion</div>
        <div class="offer">${offer.map((id, i) => {

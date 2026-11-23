@@ -180,8 +180,11 @@ export const CHEST_CHOICES = 3;
 /** After this many chests without an epic, the next offer guarantees one. */
 export const EPIC_PITY = 6;
 
+/** Chest weight of each rarity (index = rarity). */
+export const CHEST_WEIGHT = [0, 12, 4, 1];
+
 function weightedPick(pool: ChampionDef[]): ChampionDef {
-  const weight = (c: ChampionDef) => (c.rarity === 1 ? 12 : c.rarity === 2 ? 4 : 1);
+  const weight = (c: ChampionDef) => CHEST_WEIGHT[c.rarity] ?? 1;
   let roll = Math.random() * pool.reduce((n, c) => n + weight(c), 0);
   return pool.find((c) => (roll -= weight(c)) < 0) ?? pool[pool.length - 1];
 }
