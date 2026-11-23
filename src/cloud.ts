@@ -72,7 +72,9 @@ async function token(): Promise<string> {
 }
 
 export async function signUp(email: string, password: string): Promise<void> {
-  const r = await api('/auth/v1/signup', { method: 'POST', body: JSON.stringify({ email, password }) }, false);
+  // The confirmation link brings the player back to this page (the URL must be allowed in Supabase's redirect list)
+  const back = encodeURIComponent(location.origin + location.pathname);
+  const r = await api(`/auth/v1/signup?redirect_to=${back}`, { method: 'POST', body: JSON.stringify({ email, password }) }, false);
   if (!r.ok) return say(await errorText(r));
   const j = await r.json();
   // With email confirmation on, no session comes back until the link is clicked
@@ -248,9 +250,28 @@ function schedule(): void {
 }
 
 /** Starts the sync: pulls once, then pushes after changes and when the page is hidden. `refresh` re-renders the UI. */
+/**
+ * Coming back from the confirmation e-mail, Supabase puts the new session in the URL hash
+ * (#access_token=...&refresh_token=...): keep it as a normal sign-in, then clear the hash from the address bar.
+ */
+function sessionFromLink(): boolean {
+  const h = new URLSearchParams(location.hash.slice(1));
+  const access = h.get('access_token'), refresh = h.get('refresh_token');
+  if (!access || !refresh) return false;
+  history.replaceState(null, '', location.pathname + location.search);
+  try {
+    const claims = JSON.parse(atob(access.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))) as { sub: string; email: string };
+    keep({ access_token: access, refresh_token: refresh, expires_in: Number(h.get('expires_in') ?? 3600), user: { id: claims.sub, email: claims.email } });
+    meta.syncedAt = undefined; meta.syncedHash = undefined; meta.pseudo = undefined; writeMeta();
+    status = 'E-mail confirmé : tu es connecté.';
+    return true;
+  } catch { return false; }
+}
+
 export function initCloud(refresh: () => void): void {
   onChange = refresh;
   if (!cloudEnabled()) return;
+  sessionFromLink();
   onPersist(schedule);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'hidden' || !meta.session || conflict || saveHash() === meta.syncedHash) return;
