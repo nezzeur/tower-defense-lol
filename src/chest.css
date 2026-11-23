@@ -123,3 +123,13 @@
 .reduced .hx-card, .reduced.s-reveal .hx-card { animation: hxIn .25s ease both; opacity: 1; }
 .reduced .hx-take, .reduced.s-reveal .hx-take { animation: hxIn .25s ease .2s both; }
 .reduced .hx-shine { display: none; }
+
+/* Picking straight from the reveal */
+.hx-pick-h { position: absolute; left: 0; right: 0; top: 12vh; z-index: 4; text-align: center; font-family: var(--font-head); text-transform: uppercase; letter-spacing: .25em; font-size: 20px; color: var(--gold1); opacity: 0; }
+.s-reveal .hx-pick-h { animation: hxBtn .5s ease .9s both; }
+.chosen .hx-pick-h, .chosen .hx-take { opacity: 0 !important; transition: opacity .2s; pointer-events: none; }
+.hx-card.pickable { cursor: pointer; }
+.hx-card.pickable .hx-card-in { transition: transform .18s ease, box-shadow .18s ease, opacity .3s ease, filter .3s ease; }
+.hx-card.pickable:hover .hx-card-in { transform: translateY(-10px) scale(1.04); box-shadow: 0 0 34px rgba(var(--glow), .95), 0 14px 34px rgba(0, 0, 0, .6); }
+.hx-card.picked .hx-card-in { transform: translateY(-14px) scale(1.12); box-shadow: 0 0 48px rgba(var(--glow), 1), 0 0 0 3px var(--gold1); filter: brightness(1.2); }
+.hx-card.dropped .hx-card-in { opacity: .2; transform: scale(.92); filter: grayscale(.8); }

@@ -55,10 +55,17 @@ app.addEventListener('click', (e) => {
     const got = openChest();
     persist();
     if (!got) return render();
+    // The player picks the champion straight from the revealed cards ("later" keeps the offer in the shop)
+    let chosen: string | null = null;
     playChestOpening(got.map((c) => ({
-      rarity: c.rarity,
+      rarity: c.rarity, id: c.id,
       html: `<div class="hx-img" style="background-image:url('${loadingUrl(c.id)}')"></div><b>${esc(c.name)}</b><small>${RARITY[c.rarity]}</small>`,
-    })), () => render());
+    })), () => {
+      const def = chosen ? claimChest(chosen) : null;
+      persist();
+      if (def) flash(`${portrait(def, 40)}<div>Nouveau champion !<br><b>${esc(def.name)}</b> — ${esc(def.title)}</div>`);
+      render();
+    }, (id) => { chosen = id; });
     return;
   }
   if (d.claim) {

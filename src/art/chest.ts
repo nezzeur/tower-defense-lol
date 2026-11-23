@@ -55,12 +55,15 @@ export function chestIdleHTML(): string {
   return `<div class="hx-idle"><div class="hx-idle-glow"></div>${chestSVG('hx-idle-art')}<div class="hx-sparks">${sp}</div></div>`;
 }
 
-export interface RewardCard { html: string; rarity: number; }
+export interface RewardCard { html: string; rarity: number; /** Champion id: with `onPick`, clicking the card chooses it. */ id?: string }
 
 const REDUCED = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** Runs the opening sequence; `cards` are shown at the reveal, `onDone` fires when the player continues. */
-export function playChestOpening(cards: RewardCard[], onDone: () => void): void {
+/**
+ * Runs the opening sequence; `cards` are shown at the reveal. With `onPick`, the player chooses a card right there
+ * (the button then only postpones the choice); `onDone` fires when the overlay closes either way.
+ */
+export function playChestOpening(cards: RewardCard[], onDone: () => void, onPick?: (id: string) => void): void {
   const top = Math.max(...cards.map((c) => c.rarity));
   const ov = document.createElement('div');
   ov.className = `hx-overlay tier${top}${REDUCED() ? ' reduced' : ''}`;
@@ -69,8 +72,10 @@ export function playChestOpening(cards: RewardCard[], onDone: () => void): void 
   ov.innerHTML = `<div class="hx-bg"></div><div class="hx-rays"></div><div class="hx-lines">${lines}</div>
     <canvas class="hx-fx"></canvas><div class="hx-flash"></div>
     <div class="hx-stage"><div class="hx-runes">${runes}</div><div class="hx-aura"></div><div class="hx-shaker">${chestSVG('hx-main')}</div></div>
-    <div class="hx-cards">${cards.map((c, i) => `<div class="hx-card r${c.rarity}" style="--i:${i}"><div class="hx-card-in">${c.html}</div><span class="hx-shine"></span></div>`).join('')}</div>
-    <button class="hx-take btn gold big">Récupérer</button><div class="hx-skip">Cliquer pour passer</div>`;
+    ${onPick ? '<div class="hx-pick-h">Choisis ton champion</div>' : ''}
+    <div class="hx-cards">${cards.map((c, i) => `<div class="hx-card r${c.rarity} ${onPick && c.id ? 'pickable' : ''}" style="--i:${i}" ${c.id ? `data-pick="${c.id}"` : ''}><div class="hx-card-in">${c.html}</div><span class="hx-shine"></span></div>`).join('')}</div>
+    <button class="hx-take btn ${onPick ? '' : 'gold'} big">${onPick ? 'Choisir plus tard' : 'Récupérer'}</button><div class="hx-skip">Cliquer pour passer</div>`;
+  ov.classList.toggle('picking', !!onPick);
   document.body.appendChild(ov);
 
   const cv = ov.querySelector('canvas') as HTMLCanvasElement;
@@ -132,8 +137,20 @@ export function playChestOpening(cards: RewardCard[], onDone: () => void): void 
     at(1850, () => { phase = 2; ov.classList.add('s-open'); burst(); });
     at(2300, reveal);
   }
+  let picked = false;
   ov.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement).closest('.hx-take')) { if (phase >= 3) close(); return; }
+    if ((e.target as HTMLElement).closest('.hx-take')) { if (phase >= 3 && !picked) close(); return; }
+    const card = (e.target as HTMLElement).closest<HTMLElement>('.hx-card.pickable');
+    if (card && onPick && phase >= 3 && !picked) {
+      // The chosen card lights up, the others fade, then the overlay closes on the choice
+      picked = true;
+      sfx('chestBurst');
+      card.classList.add('picked');
+      ov.querySelectorAll('.hx-card').forEach((c) => { if (c !== card) c.classList.add('dropped'); });
+      ov.classList.add('chosen');
+      window.setTimeout(() => { onPick(card.dataset.pick!); close(); }, REDUCED() ? 150 : 750);
+      return;
+    }
     if (phase < 3) {
       timers.forEach(clearTimeout);
       stopSfx('chestCharge');
