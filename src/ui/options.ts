@@ -1,5 +1,5 @@
 import { fmt, stars } from '../game';
-import { account, cloudEnabled, conflict, lastSync, status } from '../cloud';
+import { account, cloudEnabled, conflict, lastSync, pseudo, status } from '../cloud';
 import { store, type SaveData } from '../save';
 import { esc } from './common';
 
@@ -33,6 +33,11 @@ function accountCard(): string {
   return `<section class="card"><h3>Compte</h3>
     <p class="small">Connecté : <b>${esc(who)}</b> · dernière synchro ${esc(when)}</p>
     <p class="muted small">La progression est envoyée sur ton compte quelques secondes après chaque changement.</p>
+    <form class="acc-pseudo row" data-pseudo-form>
+      <input id="acc-pseudo" maxlength="16" placeholder="Pseudo pour le classement" value="${esc(pseudo() ?? '')}">
+      <button class="btn ${pseudo() ? '' : 'gold'}" data-acc="pseudo">${pseudo() ? 'Changer de pseudo' : 'Choisir mon pseudo'}</button>
+    </form>
+    ${pseudo() ? '' : '<p class="small muted">Sans pseudo, tu n\'apparais pas dans le classement.</p>'}
     ${pick}
     <div class="row"><button class="btn" data-acc="sync">Synchroniser</button><button class="btn" data-acc="logout">Se déconnecter</button></div>${msg}</section>`;
 }

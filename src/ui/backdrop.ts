@@ -7,10 +7,10 @@ import { ui, type Screen } from './common';
 
 /** Light colour of each screen (the world map uses the selected region's colour instead). */
 const AMBIENT: Record<Screen, string> = {
-  maps: '#0ac8b9', champions: '#c8aa6e', shop: '#a06bff', inventory: '#3fb6d8', forge: '#ff8a3c', bestiary: '#e84057', options: '#7a8ca8', battle: '#0ac8b9',
+  maps: '#0ac8b9', champions: '#c8aa6e', shop: '#a06bff', inventory: '#3fb6d8', forge: '#ff8a3c', bestiary: '#e84057', ranking: '#f0c75e', options: '#7a8ca8', battle: '#0ac8b9',
 };
 /** Which of the player's strongest champions each screen shows, so the menus do not all look the same. */
-const SLOT: Screen[] = ['maps', 'shop', 'inventory', 'forge', 'bestiary', 'options'];
+const SLOT: Screen[] = ['maps', 'shop', 'inventory', 'forge', 'bestiary', 'ranking', 'options'];
 
 let root: HTMLElement | null = null;
 let layers: HTMLElement[] = [];

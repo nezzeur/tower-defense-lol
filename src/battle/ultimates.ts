@@ -2,7 +2,7 @@
 import { heroLook, lightColor } from '../art/heroes';
 import { sfx } from '../audio';
 import { MAX_LIVES, waveBonus } from '../game';
-import { store } from '../save';
+import { earnGold, store } from '../save';
 import { type Enemy, H, TILE, TUNE, type Tower, W, fmtShort } from './model';
 import { burst, boom, stop } from './effects';
 import { grip } from './enemies';
@@ -61,7 +61,7 @@ export function castUlt(bt: Battle, t: Tower, at?: { x: number; y: number }): bo
   if (fx.kind === 'gold') {
     if (!bt.waveActive) return false;
     const g = Math.max(1, Math.round(waveBonus(bt.map, Math.max(1, bt.wave)) * fx.mult));
-    store.data.gold += g;
+    earnGold(g);
     bt.runGold += g;
     if (vis) {
       bt.fx.push({ kind: 'text', x: t.x, y: t.y - 40, t: 0, max: 1.2, color: '#f5c542', text: `+${fmtShort(g)}`, size: 20 });

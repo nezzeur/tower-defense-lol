@@ -3,7 +3,7 @@ import { heroLook, lightColor, SHOT_SPEED } from '../art/heroes';
 import { sfx } from '../audio';
 import { MAT_BY_ID, relicOf, rollLoot } from '../data/loot';
 import { goldScale, ENDLESS_LOOT, endlessChampMap, permStackMult } from '../game';
-import { persist, store } from '../save';
+import { persist, earnGold, store } from '../save';
 import { type Enemy, type Proj, TILE, type Tower, fmtShort } from './model';
 import { boom, laserFx, auraFx, hitFx, deathFx, showBanner } from './effects';
 import { spawn, grip } from './enemies';
@@ -185,7 +185,7 @@ export function hit(bt: Battle, t: Tower, e: Enemy, mult: number): void {
   }
   if (s.goldHit && Math.random() < s.goldHit.chance) {
     const g = Math.max(1, Math.round(s.goldHit.amount * goldScale(bt.map, bt.wave)));
-    store.data.gold += g;
+    earnGold(g);
     bt.runGold += g;
     bt.fx.push({ kind: 'text', x: e.x, y: e.y - 20, t: 0, max: 0.7, color: '#f5c542', text: `+${g}` });
   }
@@ -206,7 +206,7 @@ export function kill(bt: Battle, e: Enemy, src: Tower | null): void {
   e.dead = true;
   if (bt.vfx) deathFx(bt, e, src);
   const gold = Math.max(1, Math.round(e.def.gold * goldScale(bt.map, bt.wave) * (1 + (src?.stats.killGold ?? 0) + (bt.syn.gold ?? 0))));
-  store.data.gold += gold;
+  earnGold(gold);
   store.data.kills++;
   store.data.bestiary[e.def.id] = (store.data.bestiary[e.def.id] ?? 0) + 1;
   if (e.def.shape === 'boss') bt.epicKills++;

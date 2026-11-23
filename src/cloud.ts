@@ -1,6 +1,8 @@
 // Account + cloud save (Supabase, plain fetch: no SDK). The browser save stays the source of truth while
 // playing; it is pushed to the player's account a few seconds after each change and pulled on start or login.
 // Only the main save slot syncs (?save=<name> test slots stay local). Disabled when the env keys are missing.
+import { MAPS } from './data/maps';
+import { stars } from './game';
 import { onPersist, replaceSave, saveHash, slot, store, type SaveData } from './save';
 
 const URL_ = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -9,10 +11,12 @@ const META = 'riftdefenders.cloud';
 const PUSH_DELAY = 8000;
 
 interface Session { access: string; refresh: string; expires: number; user: string; email: string }
-interface Meta { session?: Session; syncedAt?: string; syncedHash?: string }
+interface Meta { session?: Session; syncedAt?: string; syncedHash?: string; /** Leaderboard name, once chosen. */ pseudo?: string }
 export interface RemoteSave { data: SaveData; updated_at: string }
 
 export const cloudEnabled = (): boolean => !!URL_ && !!KEY_ && !slot;
+/** The leaderboard can be read from any slot, even without an account. */
+export const rankingEnabled = (): boolean => !!URL_ && !!KEY_;
 
 let meta: Meta = readMeta();
 let timer = 0;
@@ -83,7 +87,7 @@ export async function signIn(email: string, password: string): Promise<void> {
   if (!r.ok) return say(await errorText(r));
   keep(await r.json());
   // A new account on this device: what was synced before belonged to someone else
-  meta.syncedAt = undefined; meta.syncedHash = undefined; writeMeta();
+  meta.syncedAt = undefined; meta.syncedHash = undefined; meta.pseudo = undefined; writeMeta();
   say('Connecté.');
   await sync();
 }
@@ -114,6 +118,66 @@ async function push(keepalive = false): Promise<void> {
   meta.syncedAt = updated;
   meta.syncedHash = saveHash();
   writeMeta();
+  if (meta.pseudo) await pushProfile(meta.pseudo, keepalive).catch(() => undefined);
+}
+
+// ---------- Leaderboard ----------
+
+export interface Ranked { pseudo: string; kills: number; gold_earned: number; stars: number; maps: number; champions: number; endless: number; runs: number }
+export type RankSort = 'kills' | 'gold_earned' | 'stars' | 'endless';
+
+export const pseudo = (): string | null => meta.session && meta.pseudo ? meta.pseudo : null;
+
+/** The stats this player shows on the leaderboard, read from the save. */
+function myStats(): Omit<Ranked, 'pseudo'> {
+  const d = store.data;
+  return {
+    kills: Math.floor(d.kills), gold_earned: Math.floor(d.goldEarned), stars: stars(), runs: d.runs,
+    maps: MAPS.filter((m) => (d.best[m.id] ?? 0) >= m.waves).length, champions: d.owned.length,
+    endless: Math.max(0, ...Object.values(d.endless)),
+  };
+}
+
+async function pushProfile(name: string, keepalive = false): Promise<Response> {
+  return api('/rest/v1/profiles?on_conflict=user_id', {
+    method: 'POST', keepalive,
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ user_id: meta.session!.user, pseudo: name, ...myStats(), updated_at: new Date().toISOString() }),
+  });
+}
+
+export const PSEUDO_RULE = /^[\p{L}\p{N}_ .-]{3,16}$/u;
+
+/** Chooses (or changes) the leaderboard name; it must be unique. */
+export async function setPseudo(name: string): Promise<void> {
+  name = name.trim();
+  if (!meta.session) return say('Connecte-toi d\'abord.');
+  if (!PSEUDO_RULE.test(name)) return say('Pseudo : 3 à 16 caractères (lettres, chiffres, espace, _ . -).');
+  try {
+    const r = await pushProfile(name);
+    if (r.status === 409) return say('Ce pseudo est déjà pris.');
+    if (r.status === 400) return say('Pseudo refusé : garde lettres, chiffres, espace, _ . -');
+    if (!r.ok) return say(await errorText(r));
+    meta.pseudo = name;
+    writeMeta();
+    say(`Pseudo « ${name} » enregistré : tu apparais dans le classement.`);
+  } catch (e) { say((e as Error).message); }
+}
+
+async function fetchPseudo(): Promise<void> {
+  const r = await api(`/rest/v1/profiles?select=pseudo&user_id=eq.${meta.session!.user}`);
+  if (!r.ok) return;
+  const rows = await r.json() as { pseudo: string }[];
+  meta.pseudo = rows[0]?.pseudo;
+  writeMeta();
+}
+
+/** Top players for one stat (public: works without an account). */
+export async function leaderboard(sort: RankSort): Promise<Ranked[]> {
+  const cols = 'pseudo,kills,gold_earned,stars,maps,champions,endless,runs';
+  const r = await api(`/rest/v1/profiles?select=${cols}&order=${sort}.desc,updated_at.asc&limit=100`, {}, false);
+  if (!r.ok) throw new Error(await errorText(r));
+  return r.json() as Promise<Ranked[]>;
 }
 
 /** True when the save holds no real progress (a brand-new device). */
@@ -127,6 +191,7 @@ export async function sync(): Promise<void> {
   if (!cloudEnabled() || !meta.session || busy) return;
   busy = true;
   try {
+    if (meta.pseudo === undefined) await fetchPseudo().catch(() => undefined);
     const remote = await pull();
     const local = saveHash();
     if (!remote) { await push(); say('Sauvegarde envoyée sur ton compte.'); return; }

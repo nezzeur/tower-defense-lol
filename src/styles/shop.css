@@ -31,3 +31,20 @@
 .acc-form input { padding: 8px 10px; background: var(--bg1); color: inherit; border: 1px solid var(--gold4); }
 .acc-msg { color: var(--gold1); }
 .acc-conflict { display: grid; gap: 10px; padding: 10px 12px; margin: 8px 0; border: 1px solid var(--gold2); background: rgba(200, 170, 110, 0.06); }
+
+/* Leaderboard */
+.ranking { display: grid; gap: 12px; max-width: 980px; }
+.rank-sorts { display: flex; flex-wrap: wrap; gap: 4px; }
+.rank-wrap { overflow-x: auto; background: var(--fill, rgba(1, 10, 19, 0.6)); border: 1px solid var(--gold4); }
+.rank-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rank-table th { text-align: right; padding: 10px 12px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--gold4); white-space: nowrap; }
+.rank-table td { text-align: right; padding: 8px 12px; border-bottom: 1px solid rgba(200, 170, 110, 0.12); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rank-table th:nth-child(-n+2), .rank-table td.rk, .rank-table td.ps { text-align: left; }
+.rank-table td.rk { width: 44px; color: var(--muted); font-weight: 700; }
+.rank-table td.ps { font-weight: 700; color: var(--gold1); }
+.rank-table td.on { color: var(--gold1); font-weight: 700; }
+.rank-table tr.top1 td.rk { color: #f0c75e; }
+.rank-table tr.top2 td.rk { color: #cfd8e3; }
+.rank-table tr.top3 td.rk { color: #d08a52; }
+.rank-table tr.me td { background: rgba(10, 200, 185, 0.1); }
+.acc-pseudo input { padding: 8px 10px; background: var(--bg1); color: inherit; border: 1px solid var(--gold4); min-width: 220px; }

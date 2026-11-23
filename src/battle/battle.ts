@@ -11,7 +11,7 @@ import { BOON_AUTO_DELAY, BOON_BY_ID, BOON_CHANCE, BOON_MAX, rollBoons, type Boo
 import { teamSynergies, type SynStat } from '../data/synergies';
 import { COLS, ROWS } from '../data/maps';
 import { buildWave, champ, computeStats, endlessHp, endlessUnlocked, goldScale, hpScale, level, MAX_LIVES, START_LIVES, teamSlots, waveBonus, type Spawn, ENDLESS_LOOT, endlessWaveFactor } from '../game';
-import { persist, store } from '../save';
+import { persist, earnGold, store } from '../save';
 import type { ChampionDef, FeatureKind, MapDef, Priority, Stats } from '../types';
 import { type BattleEvents, type Enemy, type Fx, H, type Proj, SPELLS, STEP, type SpellId, TEAM_SLOTS, TILE, type Tower, W, fmtShort } from './model';
 import { tileAtClient, enemyAtPoint, bindInput } from './input';
@@ -574,7 +574,7 @@ export class Battle {
     this.waveActive = false;
     const d = store.data;
     const bonus = waveBonus(this.map, this.wave);
-    d.gold += bonus;
+    earnGold(bonus);
     this.runGold += bonus;
     if (this.wave !== this.map.waves) showBanner(this, this.endless ? `Infini · vague ${this.endlessWave()} repoussée` : `Vague ${this.wave} repoussée`, `+${fmtShort(bonus)} or`, '#f5c542');
     d.best[this.map.id] = Math.max(d.best[this.map.id] ?? 0, Math.min(this.wave, this.map.waves));

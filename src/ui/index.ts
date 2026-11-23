@@ -8,6 +8,7 @@ import { MAP_BY_ID } from '../data/maps';
 import { forgeScreen, inventoryScreen } from './inventory';
 import { optionsScreen } from './options';
 import { bestiaryScreen } from './bestiary';
+import { rankingScreen } from './ranking';
 import { shopScreen } from './shop';
 import { renderStarter } from './starter';
 import './events';
@@ -21,7 +22,7 @@ const CREST = `<svg class="crest" viewBox="0 0 40 44" aria-hidden="true"><defs><
 let lastScreen = '';
 
 function header(): string {
-  const tabs: [Screen, string][] = [['maps', 'Cartes'], ['champions', 'Champions'], ['shop', 'Boutique'], ['inventory', 'Inventaire'], ['forge', 'Forge'], ['bestiary', 'Bestiaire'], ['options', 'Options']];
+  const tabs: [Screen, string][] = [['maps', 'Cartes'], ['champions', 'Champions'], ['shop', 'Boutique'], ['inventory', 'Inventaire'], ['forge', 'Forge'], ['bestiary', 'Bestiaire'], ['ranking', 'Classement'], ['options', 'Options']];
   const next = MAP_BY_ID[currentMap()];
   return `<header class="top">
     <div class="logo" data-nav="maps">${CREST}<div>RIFT<span>DEFENDERS</span></div></div>
@@ -36,7 +37,7 @@ export function render(): void {
   if (!store.data.owned.length) return renderStarter();
   if (ui.screen === 'battle') return;
   const body = ui.screen === 'maps' ? mapsScreen() : ui.screen === 'champions' ? champsScreen()
-    : ui.screen === 'shop' ? shopScreen() : ui.screen === 'inventory' ? inventoryScreen() : ui.screen === 'forge' ? forgeScreen() : ui.screen === 'bestiary' ? bestiaryScreen() : optionsScreen();
+    : ui.screen === 'shop' ? shopScreen() : ui.screen === 'inventory' ? inventoryScreen() : ui.screen === 'forge' ? forgeScreen() : ui.screen === 'bestiary' ? bestiaryScreen() : ui.screen === 'ranking' ? rankingScreen() : optionsScreen();
   // The entrance plays when the screen changes, not on every refresh of the same screen
   app.innerHTML = header() + `<main class="screen ${lastScreen === ui.screen ? '' : 'enter'}">${body}</main>`;
   lastScreen = ui.screen;

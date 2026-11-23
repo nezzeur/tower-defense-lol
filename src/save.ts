@@ -33,6 +33,8 @@ export interface SaveData {
   /** Targeting priority per champion (default 'first'). */
   priorities: Record<string, Priority>;
   speed: number;
+  /** Gold earned over the whole game (leaderboard), spending does not lower it. */
+  goldEarned: number;
   /** Regions whose opening was already celebrated on the world map (undefined: fill silently on first visit). */
   regionsSeen?: string[];
   auto: boolean;
@@ -58,7 +60,7 @@ const KEY = 'riftdefenders.save.v1' + (slot ? `:${slot}` : '');
 function fresh(): SaveData {
   return {
     v: 1, gold: 0, owned: [], levels: {}, stacks: {}, items: [], mats: {}, equip: {}, best: {}, endless: {}, layouts: {}, teams: {}, teamSlot: {}, bestiary: {}, priorities: {},
-    chestsOpened: 0, chestOffer: null, chestsSinceEpic: 0, speed: 1, auto: false, autoUlt: false, lowFx: false, kills: 0, runs: 0, volume: 0.5, muted: false, music: 0.35,
+    chestsOpened: 0, chestOffer: null, chestsSinceEpic: 0, speed: 1, goldEarned: 0, auto: false, autoUlt: false, lowFx: false, kills: 0, runs: 0, volume: 0.5, muted: false, music: 0.35,
   };
 }
 
@@ -86,6 +88,7 @@ function sanitize(raw: unknown): SaveData {
   if (!d.mats || typeof d.mats !== 'object' || Array.isArray(d.mats)) d.mats = {};
   d.autoUlt = d.autoUlt === true;
   d.lowFx = d.lowFx === true;
+  if (typeof d.goldEarned !== 'number' || !(d.goldEarned >= 0)) d.goldEarned = 0;
   // Game speed is x1 or x2 only
   d.speed = d.speed === 2 ? 2 : 1;
   if (d.regionsSeen !== undefined && !Array.isArray(d.regionsSeen)) d.regionsSeen = undefined;
@@ -110,6 +113,12 @@ function load(): SaveData {
 }
 
 export const store: { data: SaveData } = { data: load() };
+
+/** Adds gold the player earned (also counted for the leaderboard). */
+export function earnGold(n: number): void {
+  store.data.gold += n;
+  store.data.goldEarned += n;
+}
 
 let persistHook: () => void = () => {};
 /** Called after every save to the browser (the cloud sync schedules its upload from here). */
