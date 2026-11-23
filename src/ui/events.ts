@@ -7,6 +7,7 @@ import { applyMusicVolume } from '../music';
 import { resetTutorial } from './tutorial';
 import type { SpellId } from '../battle';
 import type { Priority } from '../types';
+import { keepLocal, keepRemote, signIn, signOut, signUp, sync } from '../cloud';
 import { exportSave, importSave, persist, resetSave, store } from '../save';
 import { selectRegion } from './atlas';
 import { leaveBattle, refreshLive, renderSide, startBattle } from './battleHud';
@@ -84,6 +85,16 @@ app.addEventListener('click', (e) => {
     }
     return render();
   }
+  if (d.acc) {
+    e.preventDefault();
+    const email = (document.getElementById('acc-email') as HTMLInputElement | null)?.value.trim() ?? '';
+    const pass = (document.getElementById('acc-pass') as HTMLInputElement | null)?.value ?? '';
+    if ((d.acc === 'login' || d.acc === 'signup') && (!email || pass.length < 6)) { flash('E-mail et mot de passe (6 caractères min.)'); return; }
+    const run = { login: () => signIn(email, pass), signup: () => signUp(email, pass), logout: signOut, sync, 'keep-remote': keepRemote, 'keep-local': keepLocal }[d.acc];
+    (el as HTMLButtonElement).disabled = true;
+    void run?.().finally(render);
+    return;
+  }
   if (d.tuto !== undefined) { resetTutorial(); flash('Tutoriel réactivé'); return render(); }
   if (d.export !== undefined) { (document.getElementById('save-out') as HTMLTextAreaElement).value = exportSave(); return; }
   if (d.copy !== undefined) {
@@ -139,6 +150,12 @@ app.addEventListener('click', (e) => {
   if (d.deselectEnemy !== undefined) { b.selectedEnemy = null; return renderSide(); }
   if (d.deselect !== undefined) { b.selectedTower = null; return renderSide(); }
   if (d.remove !== undefined && b.selectedTower) { b.remove(b.selectedTower); return renderSide(); }
+});
+
+// Enter in the account form signs in (never reloads the page)
+app.addEventListener('submit', (e) => {
+  e.preventDefault();
+  (document.querySelector('[data-acc="login"]') as HTMLButtonElement | null)?.click();
 });
 
 app.addEventListener('input', (e) => {

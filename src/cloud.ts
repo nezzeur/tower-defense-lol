@@ -1,0 +1,196 @@
+// Account + cloud save (Supabase, plain fetch: no SDK). The browser save stays the source of truth while
+// playing; it is pushed to the player's account a few seconds after each change and pulled on start or login.
+// Only the main save slot syncs (?save=<name> test slots stay local). Disabled when the env keys are missing.
+import { onPersist, replaceSave, saveHash, slot, store, type SaveData } from './save';
+
+const URL_ = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const KEY_ = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const META = 'riftdefenders.cloud';
+const PUSH_DELAY = 8000;
+
+interface Session { access: string; refresh: string; expires: number; user: string; email: string }
+interface Meta { session?: Session; syncedAt?: string; syncedHash?: string }
+export interface RemoteSave { data: SaveData; updated_at: string }
+
+export const cloudEnabled = (): boolean => !!URL_ && !!KEY_ && !slot;
+
+let meta: Meta = readMeta();
+let timer = 0;
+let busy = false;
+/** Set when the account and this device both changed since the last sync: the player picks one. */
+export let conflict: RemoteSave | null = null;
+export let status = '';
+let onChange: () => void = () => {};
+
+function readMeta(): Meta {
+  try { return JSON.parse(localStorage.getItem(META) ?? '{}') as Meta; } catch { return {}; }
+}
+function writeMeta(): void {
+  try { localStorage.setItem(META, JSON.stringify(meta)); } catch { /* storage blocked */ }
+}
+function say(s: string): void { status = s; onChange(); }
+
+export const account = (): string | null => meta.session?.email ?? null;
+export const lastSync = (): string | null => meta.syncedAt ?? null;
+
+async function api(path: string, init: RequestInit = {}, auth = true): Promise<Response> {
+  const headers: Record<string, string> = { apikey: KEY_!, 'Content-Type': 'application/json', ...(init.headers as Record<string, string>) };
+  if (auth) headers.Authorization = `Bearer ${await token()}`;
+  return fetch(`${URL_}${path}`, { ...init, headers });
+}
+
+async function errorText(r: Response): Promise<string> {
+  try {
+    const j = await r.json() as { msg?: string; error_description?: string; message?: string; error?: string };
+    const raw = j.msg ?? j.error_description ?? j.message ?? j.error ?? '';
+    if (/invalid login/i.test(raw)) return 'E-mail ou mot de passe incorrect.';
+    if (/not confirmed/i.test(raw)) return 'Confirme d\'abord ton e-mail (lien reçu par mail).';
+    if (/already registered/i.test(raw)) return 'Ce compte existe déjà : connecte-toi.';
+    if (/password/i.test(raw)) return 'Mot de passe trop court (6 caractères minimum).';
+    return raw || `Erreur ${r.status}`;
+  } catch { return `Erreur ${r.status}`; }
+}
+
+function keep(j: { access_token: string; refresh_token: string; expires_in: number; user: { id: string; email: string } }): void {
+  meta.session = { access: j.access_token, refresh: j.refresh_token, expires: Date.now() + j.expires_in * 1000, user: j.user.id, email: j.user.email };
+  writeMeta();
+}
+
+/** A valid access token, refreshed when it is about to expire. */
+async function token(): Promise<string> {
+  const s = meta.session;
+  if (!s) throw new Error('Non connecté');
+  if (Date.now() < s.expires - 60_000) return s.access;
+  const r = await api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: s.refresh }) }, false);
+  if (!r.ok) { meta.session = undefined; writeMeta(); throw new Error('Session expirée : reconnecte-toi.'); }
+  keep(await r.json());
+  return meta.session!.access;
+}
+
+export async function signUp(email: string, password: string): Promise<void> {
+  const r = await api('/auth/v1/signup', { method: 'POST', body: JSON.stringify({ email, password }) }, false);
+  if (!r.ok) return say(await errorText(r));
+  const j = await r.json();
+  // With email confirmation on, no session comes back until the link is clicked
+  if (!j.access_token) return say('Compte créé. Clique sur le lien reçu par e-mail, puis connecte-toi.');
+  keep(j);
+  say('Compte créé.');
+  await sync();
+}
+
+export async function signIn(email: string, password: string): Promise<void> {
+  const r = await api('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email, password }) }, false);
+  if (!r.ok) return say(await errorText(r));
+  keep(await r.json());
+  // A new account on this device: what was synced before belonged to someone else
+  meta.syncedAt = undefined; meta.syncedHash = undefined; writeMeta();
+  say('Connecté.');
+  await sync();
+}
+
+export async function signOut(): Promise<void> {
+  if (meta.session) await api('/auth/v1/logout', { method: 'POST' }).catch(() => undefined);
+  meta = {};
+  conflict = null;
+  writeMeta();
+  say('Déconnecté. La sauvegarde reste sur cet appareil.');
+}
+
+async function pull(): Promise<RemoteSave | null> {
+  const r = await api(`/rest/v1/saves?select=data,updated_at&user_id=eq.${meta.session!.user}`);
+  if (!r.ok) throw new Error(await errorText(r));
+  const rows = await r.json() as RemoteSave[];
+  return rows[0] ?? null;
+}
+
+async function push(keepalive = false): Promise<void> {
+  const updated = new Date().toISOString();
+  const r = await api('/rest/v1/saves?on_conflict=user_id', {
+    method: 'POST', keepalive,
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ user_id: meta.session!.user, data: store.data, updated_at: updated }),
+  });
+  if (!r.ok) throw new Error(await errorText(r));
+  meta.syncedAt = updated;
+  meta.syncedHash = saveHash();
+  writeMeta();
+}
+
+/** True when the save holds no real progress (a brand-new device). */
+const empty = (d: SaveData): boolean => d.runs === 0 && d.owned.length <= 1 && Object.keys(d.best).length === 0;
+
+/**
+ * Reconciles this device with the account: whichever side changed since the last sync wins;
+ * when both changed, `conflict` is set and the player chooses (keepRemote / keepLocal).
+ */
+export async function sync(): Promise<void> {
+  if (!cloudEnabled() || !meta.session || busy) return;
+  busy = true;
+  try {
+    const remote = await pull();
+    const local = saveHash();
+    if (!remote) { await push(); say('Sauvegarde envoyée sur ton compte.'); return; }
+    const remoteHash = saveHash(remote.data);
+    const localChanged = local !== meta.syncedHash;
+    // Postgres formats timestamps its own way: compare instants, not strings
+    const remoteChanged = !meta.syncedAt || Date.parse(remote.updated_at) !== Date.parse(meta.syncedAt);
+    if (remoteHash === local) {
+      meta.syncedAt = remote.updated_at; meta.syncedHash = local; writeMeta();
+      say('Synchronisé.');
+    } else if (!localChanged || (empty(store.data) && meta.syncedHash === undefined)) {
+      adopt(remote);
+      say('Sauvegarde du compte chargée.');
+    } else if (!remoteChanged) {
+      await push();
+      say('Synchronisé.');
+    } else {
+      conflict = remote;
+      say('Ta sauvegarde diffère entre ce compte et cet appareil : choisis laquelle garder.');
+    }
+  } catch (e) {
+    say((e as Error).message || 'Synchronisation impossible (hors ligne ?).');
+  } finally {
+    busy = false;
+  }
+}
+
+function adopt(remote: RemoteSave): void {
+  replaceSave(remote.data);
+  meta.syncedAt = remote.updated_at;
+  meta.syncedHash = saveHash();
+  writeMeta();
+}
+
+export async function keepRemote(): Promise<void> {
+  if (!conflict) return;
+  adopt(conflict);
+  conflict = null;
+  say('Sauvegarde du compte chargée.');
+}
+
+export async function keepLocal(): Promise<void> {
+  conflict = null;
+  try { await push(); say('Sauvegarde de cet appareil envoyée sur ton compte.'); } catch (e) { say((e as Error).message); }
+}
+
+function schedule(): void {
+  if (!cloudEnabled() || !meta.session || conflict) return;
+  clearTimeout(timer);
+  timer = window.setTimeout(() => {
+    if (saveHash() === meta.syncedHash) return;
+    push().then(() => onChange(), () => { /* offline: retried on the next change */ });
+  }, PUSH_DELAY);
+}
+
+/** Starts the sync: pulls once, then pushes after changes and when the page is hidden. `refresh` re-renders the UI. */
+export function initCloud(refresh: () => void): void {
+  onChange = refresh;
+  if (!cloudEnabled()) return;
+  onPersist(schedule);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'hidden' || !meta.session || conflict || saveHash() === meta.syncedHash) return;
+    clearTimeout(timer);
+    void push(true).catch(() => undefined);
+  });
+  if (meta.session) void sync().then(refresh);
+}

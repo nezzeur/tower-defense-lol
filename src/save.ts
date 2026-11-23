@@ -52,7 +52,7 @@ export interface SaveData {
 }
 
 // ?save=<name> uses a separate save slot (testing without touching real progress).
-const slot = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('save');
+export const slot = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('save');
 const KEY = 'riftdefenders.save.v1' + (slot ? `:${slot}` : '');
 
 function fresh(): SaveData {
@@ -111,12 +111,35 @@ function load(): SaveData {
 
 export const store: { data: SaveData } = { data: load() };
 
+let persistHook: () => void = () => {};
+/** Called after every save to the browser (the cloud sync schedules its upload from here). */
+export function onPersist(fn: () => void): void { persistHook = fn; }
+
 export function persist(): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(store.data));
   } catch {
     /* storage full or blocked: keep playing in memory */
   }
+  persistHook();
+}
+
+/** Replaces the whole save (cloud download), validated like an import. */
+export function replaceSave(raw: unknown): void {
+  const next = sanitize(raw);
+  // The save being replaced stays in the browser as a backup, so a wrong choice never loses progress
+  try { localStorage.setItem(`${KEY}.backup.${Date.now()}`, JSON.stringify(store.data)); } catch { /* storage full or blocked */ }
+  store.data = next;
+  persist();
+}
+
+/** Short fingerprint of a save, to tell whether two copies differ. */
+export function saveHash(d: SaveData = store.data): string {
+  // Keys sorted at every depth: the database stores JSON with its own key order
+  const canon = (v: unknown): unknown => v && typeof v === 'object' && !Array.isArray(v)
+    ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon((v as Record<string, unknown>)[k])]))
+    : Array.isArray(v) ? v.map(canon) : v;
+  return hash(JSON.stringify(canon(d)));
 }
 
 function hash(s: string): string {
@@ -148,8 +171,7 @@ export function importSave(code: string): void {
   if (tag !== 'RD1' || !body || !sum) throw new Error('Code invalide');
   const json = fromB64(body);
   if (hash(json) !== sum) throw new Error('Code corrompu (checksum)');
-  store.data = sanitize(JSON.parse(json));
-  persist();
+  replaceSave(JSON.parse(json));
 }
 
 export function resetSave(): void {

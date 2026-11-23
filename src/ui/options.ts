@@ -1,5 +1,41 @@
 import { fmt, stars } from '../game';
-import { store } from '../save';
+import { account, cloudEnabled, conflict, lastSync, status } from '../cloud';
+import { store, type SaveData } from '../save';
+import { esc } from './common';
+
+/** One-line summary of a save, to compare the account's copy with this device's. */
+function brief(d: SaveData): string {
+  const lv = Object.values(d.levels).reduce((n, l) => n + l, 0);
+  const st = Object.values(d.best).length;
+  return `${d.owned.length} champions · niveaux cumulés ${lv} · ${st} cartes jouées · ${fmt(d.gold)} or · ${d.runs} parties`;
+}
+
+/** Account panel: sign in to keep the same save on every device. */
+function accountCard(): string {
+  if (!cloudEnabled()) return '';
+  const who = account();
+  const msg = status ? `<p class="small acc-msg">${esc(status)}</p>` : '';
+  if (!who) {
+    return `<section class="card"><h3>Compte</h3>
+      <p class="muted small">Connecte-toi pour retrouver ta progression sur tous tes appareils, sans code à copier.</p>
+      <form class="acc-form" data-acc-form>
+        <input id="acc-email" type="email" autocomplete="email" placeholder="E-mail" required>
+        <input id="acc-pass" type="password" autocomplete="current-password" placeholder="Mot de passe (6 caractères min.)" minlength="6" required>
+        <div class="row"><button class="btn gold" data-acc="login">Se connecter</button><button class="btn" data-acc="signup">Créer un compte</button></div>
+      </form>${msg}</section>`;
+  }
+  const when = lastSync() ? new Date(lastSync()!).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'jamais';
+  const pick = conflict ? `<div class="acc-conflict">
+      <div><b>Compte</b> (${esc(new Date(conflict.updated_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }))})<br><span class="small">${esc(brief(conflict.data))}</span></div>
+      <div><b>Cet appareil</b><br><span class="small">${esc(brief(store.data))}</span></div>
+      <div class="row"><button class="btn gold" data-acc="keep-remote">Garder le compte</button><button class="btn" data-acc="keep-local">Garder cet appareil</button></div>
+    </div>` : '';
+  return `<section class="card"><h3>Compte</h3>
+    <p class="small">Connecté : <b>${esc(who)}</b> · dernière synchro ${esc(when)}</p>
+    <p class="muted small">La progression est envoyée sur ton compte quelques secondes après chaque changement.</p>
+    ${pick}
+    <div class="row"><button class="btn" data-acc="sync">Synchroniser</button><button class="btn" data-acc="logout">Se déconnecter</button></div>${msg}</section>`;
+}
 
 export function optionsScreen(): string {
   const d = store.data;
@@ -21,6 +57,7 @@ export function optionsScreen(): string {
       <div class="row"><button class="btn" data-tuto>Revoir le tutoriel</button>
         <span class="small muted">Réaffiche toutes les bulles d'aide, sur les menus comme en combat.</span></div>
     </section>
+    ${accountCard()}
     <section class="card"><h3>Sauvegarde</h3>
       <p class="muted small">Sauvegarde automatique dans le navigateur. Exporte régulièrement : vider les données du navigateur efface ta progression.</p>
       <div class="row"><button class="btn" data-export>Exporter</button><button class="btn" data-copy>Copier</button></div>
